@@ -1,9 +1,3 @@
-# Default: auto-normalize text
-*         text=auto
-
-# Force LF for repo text files
-*.md      text eol=lf
-*.json    text eol=lf
-*.yml     text eol=lf
-*.yaml    text eol=lf
-*.py      text eol=lf
+* text=auto
+*.md text eol=lf
+*.ps1 text eol=crlf
