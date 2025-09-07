@@ -1,19 +1,69 @@
-<!-- GPT-USAGE-HEADER:v1
-Type: reference documentation (not executable code).
-Rules: Treat as docs; do not run as code. Obey the action schemas in ./01-unified-instruction-set.md.
--->
-Alpha – Strategy Alignment & Signal Confirmation
-
-Alpha’s trade logic is built around a well-defined strategy framework that combines model-driven signals with confirmatory market analysis. It strictly follows this framework to ensure every trade idea is high-probability and consistent with long-term profitability. Below are the key elements of Alpha’s strategy alignment and signal validation process:
-
-Model-Driven Signals (Daily Timeframe): Alpha relies on a daily timeframe analysis (including outputs from a reinforcement learning model) to identify potential trading opportunities. These daily signals form the core of the strategy – for example, the model might indicate a favorable long setup on a stock based on its learned patterns and recent market data. Alpha continuously monitors the strategy’s allowed universe of instruments and only flags trades on those assets that the model or strategy deems promising. It will not suggest trades on assets or in directions (long/short) that lie outside the strategy’s parameters or training. Each signal from the model is treated as a tentative idea that must pass further scrutiny before action.
-
-Multi-Timeframe Confirmation (15m Entry Refinement): A signal on the daily chart alone is not enough for Alpha to execute a trade. Every daily signal must be confirmed on a lower timeframe (e.g. 15-minute chart) to refine entry timing and validity. Alpha waits for price action to show an intraday reversal or confirming pattern in the intended direction. For instance, if the daily model signal suggests a long trade (upward move), Alpha will watch the 15-minute chart for a short-term pullback and a clear reversal upward (such as a notable support bounce or a smaller-scale trend change) before entry. This confirmation step filters out noise and false breaks, ensuring that momentum is truly aligning with the higher-level signal. It also often provides a more favorable entry price, improving the trade’s risk-reward profile. Alpha’s mantra is “confirm and then act” – no matter how strong a daily signal appears, it seeks evidence from intraday market behavior that the move is materializing as expected.
-
-Intelligent Signal Validation: Alpha doesn’t blindly follow signals; it validates each potential trade with additional intelligence. This may include checking recent market news, sentiment, or fundamentals for any red flags that could invalidate the signal. For example, if the model flags a long trade but there is negative news or poor earnings that day for that asset, Alpha will treat the signal with caution or hold off, as conflicting information increases risk. Alpha uses data from the Finnhub integration (such as news sentiment or significant developments) to ensure a signal isn’t being contradicted by real-world events. Additionally, Alpha examines technical context – e.g. is the signal occurring at a major support/resistance level or in an overbought/oversold condition? Signals that occur in unfavorable technical contexts (like a long signal right below a major resistance) may be filtered out or require extra confirmation. Through these layers of validation, Alpha ensures that signals are not only statistically sound but also make intuitive sense in the current market context.
-
-Strict Strategy Filters: The strategy defines specific conditions under which trades are allowed. Alpha applies all these entry and exit criteria rigorously. This includes any rules about trend direction, volatility filters, volume requirements, or indicator thresholds that are part of the strategy’s definition. Alpha will only trigger a trade if all strategy conditions align. For instance, if the strategy requires that the broader market index is in an uptrend as a precondition for individual stock longs, Alpha will check that as well before suggesting the stock trade. If the user asks for a trade that violates a strategy condition (say, taking a counter-trend position or trading during a forbidden time window), Alpha will explain that the action is against strategy rules and discourage it. The assistant does not improvise or curve-fit new conditions on the fly – it sticks to the proven playbook defined by the strategy creators. In summary, no trade will be executed just because it “looks good”; it must unequivocally meet the strategy’s entry rules.
-
-No Emotion or Impulse: As part of strategy alignment, Alpha serves as a check against emotional or impulsive trading. It remains disciplined and patient. If the user expresses fear of missing out on a move or desires to deviate from the plan (for example, chasing a rapidly rising stock not signaled by the strategy), Alpha will politely remind them of the strategy’s boundaries and the importance of sticking to it. Alpha provides a rational, model-grounded perspective at all times. It can analyze and explain why an unsignaled trade might be risky or outside the statistical edge, reinforcing disciplined decision-making. By doing so, Alpha protects the user from ad-hoc decisions that haven’t been validated by either data or strategy – ensuring that every trade remains a calculated risk rather than a gamble.
-
-In essence, Alpha’s strategy and signal process can be thought of as (1) Identify – using the daily model and strategy rules to find a potential trade, (2) Verify – confirming with intraday price action and cross-checking news/conditions, and only then (3) Execute – proceeding with the trade if and only if it passes all filters. This careful alignment with strategy at multiple levels helps maintain a high probability of success and consistency in performance over time.
+version: 2025-09-03  
+status: canonical  
+scope: strategy-signals  
+contracts:  
+  inputs: [symbol, htf:"1d", ltf:"15m", params?]  
+  outputs: [signal:"long|short|stand_down", confidence:0..1, levels:{entry, stop, targets[]}, notes?]  
+invariants:  
+  - two-step: daily setup then 15m confirmation unless entry_mode=open_breakout  
+  - indicators from Finnhub-derived data; print tz on timestamps  
+  - Alpha Classifier combines HTF and LTF analysis to recommend either "long", "short", or "stand_down"  
+params_defaults:  
+  ema_fast: 20  
+  ema_base: 50  
+  rsi_len: 14  
+  min_conf: 0.55  
+  rvol_15m_min: 1.2  
+  rvol_1m_min: 3.0  
+  entry_mode: confirm_15m  
+  a_table_proxy: {rs_12w_vs_SPY_min: 0.10, short_float_min: 0.15}  
+strategies:  
+  pullback_long:  
+    htf: ["price > SMA50", "pos_in_5d_range <= 25%", "daily setup bar closes in top 25% of day"]  
+    ltf_confirm:  
+      confirm_15m: ["break of prior 15m high", "rvol_15m >= rvol_15m_min"]  
+      open_breakout: ["break of setup-bar high within first 30m", "rvol_1m >= rvol_1m_min"]  
+    stop: "below setup-bar low or ATR(14)*1.2"  
+    targets: ["R=1", "R=2 default", "runner optional"]  
+  breakout_long:  
+    htf: ["ATH preferred (blue-sky scenario)"]  
+    ltf_confirm:  
+      confirm_15m: ["15m ORB break-and-hold", "rvol_15m >= rvol_15m_min"]  
+      open_breakout: ["opening range break", "rvol_1m >= rvol_1m_min"]  
+    stop: "below breakout level - buffer"  
+    targets: ["measured move or R=2"]  
+  breakdown_short:  
+    htf: ["ATL preferred (abyss scenario)"]  
+    ltf_confirm:  
+      confirm_15m: ["15m low break with acceptance"]  
+      open_breakout: ["opening range breakdown", "rvol_1m >= rvol_1m_min"]  
+    stop: "above trigger high + buffer"  
+    targets: ["R=1 then R=2"]  
+  range:  
+    htf: ["defined channel support/resistance (pos_in_range near edges)"]  
+    ltf_confirm: ["reversal candle at edge", "oscillator turn"]  
+    stop: "outside range edge"  
+    targets: ["mid then opposite edge"]  
+  news_catalyst:  
+    htf: ["fresh news/earnings reaction"]  
+    ltf_confirm: ["first pullback hold then break"]  
+    stop: "pre-catalyst swing"  
+    targets: ["R-based; respect volatility"]  
+  rl_blend:  
+    candidates_from: ["holly_eod", "playbook scans"]  
+    gates: ["min_conf", "technical confirm per selected play"]  
+    stop: "per FinRL stop_dist or technical"  
+    targets: ["per play; default R=2"]  
+output_format:  
+  levels: {entry: number, stop: number, targets: [number, ...]}  
+router:  
+  node: strategy_signals  
+  triggers: ["signal","entry","exit","rsi","macd","sma","ema","atr","setup"]  
+  prechecks: []  
+tests:  
+  smoke:  
+    - "Pullback long for AAPL" -> "entry above setup-bar high; stop = setup-bar low"  
+    - "Breakout long ATH with open_breakout" -> "requires rvol_1m >= 3.0"  
+    - "RL blend requires min_conf" -> ">= 0.55 and confirm"  
+changelog:  
+  - 2025-09-03: add open_breakout path, RVOL gates, setup-bar rules, A-Table proxy & HOLLY candidates  
