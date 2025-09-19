@@ -45,7 +45,7 @@ paths:
       parameters:
         - { name: order_id, in: path, required: true, schema: { type: string } }
       responses:
-        "200": { description: Order cancelled }
+        "204": { description: Order cancelled }
   /v1/account:
     get:
       summary: Get account details

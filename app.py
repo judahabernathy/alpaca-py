@@ -103,14 +103,18 @@ def get_order(order_id: str, x_api_key: Optional[str] = Header(None)):
 
 @app.delete("/v1/orders/{order_id}")
 def cancel_order(order_id: str, x_api_key: Optional[str] = Header(None)):
-    """Cancel an open order by its ID."""
+    """Cancel an open order by its ID.
+
+    Alpaca's trading API uses the ``/v2/orders/{order_id}`` endpoint for
+    cancellations and expects the DELETE request to omit a payload.  Delegate
+    to :class:`~alpaca.trading.client.TradingClient` so the underlying request
+    is constructed correctly and no JSON body is sent.
+    """
 
     check_key(x_api_key)
 
-    # TradingClient exposes the correct v2 cancellation endpoint which does
-    # not accept a request body.  Delegate to it directly so the request is
-    # sent to ``/v2/orders/{order_id}`` without any JSON payload.
-    trading_client().cancel_order_by_id(order_id)
+    tc = trading_client()
+    tc.cancel_order_by_id(order_id)
 
     # The Alpaca REST API returns HTTP 204 with an empty body on success, so
     # mirror that behaviour for the FastAPI route.
