@@ -2,7 +2,7 @@ import os
 import re
 from datetime import datetime
 from typing import List, Optional
-from fastapi import FastAPI, Header, HTTPException, Query, Path
+from fastapi import FastAPI, Header, HTTPException, Query, Path, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from alpaca.trading.client import TradingClient
@@ -103,9 +103,18 @@ def get_order(order_id: str, x_api_key: Optional[str] = Header(None)):
 
 @app.delete("/v1/orders/{order_id}")
 def cancel_order(order_id: str, x_api_key: Optional[str] = Header(None)):
+    """Cancel an open order by its ID."""
+
     check_key(x_api_key)
-    tc = trading_client()
-    return tc.cancel_order(order_id)
+
+    # TradingClient exposes the correct v2 cancellation endpoint which does
+    # not accept a request body.  Delegate to it directly so the request is
+    # sent to ``/v2/orders/{order_id}`` without any JSON payload.
+    trading_client().cancel_order_by_id(order_id)
+
+    # The Alpaca REST API returns HTTP 204 with an empty body on success, so
+    # mirror that behaviour for the FastAPI route.
+    return Response(status_code=204)
 
 # -- Account
 @app.get("/v1/account")
