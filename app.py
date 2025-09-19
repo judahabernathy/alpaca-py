@@ -114,6 +114,8 @@ def cancel_order(order_id: str, x_api_key: Optional[str] = Header(None)):
     check_key(x_api_key)
 
     tc = trading_client()
+    # The TradingClient handles targeting the v2 endpoint and omits the
+    # request body, which matches the behaviour expected by Alpaca's REST API.
     tc.cancel_order_by_id(order_id)
 
     # The Alpaca REST API returns HTTP 204 with an empty body on success, so
