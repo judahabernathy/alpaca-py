@@ -101,7 +101,12 @@ def get_order(order_id: str, x_api_key: Optional[str] = Header(None)):
     o = tc.get_order_by_id(order_id)
     return o.model_dump() if hasattr(o, "model_dump") else o.__dict__
 
-@app.delete("/v1/orders/{order_id}")
+@app.delete(
+    "/v1/orders/{order_id}",
+    status_code=204,
+    summary="Cancel order",
+    response_description="Order cancelled",
+)
 def cancel_order(order_id: str, x_api_key: Optional[str] = Header(None)):
     """Cancel an open order by its ID.
 
@@ -118,8 +123,7 @@ def cancel_order(order_id: str, x_api_key: Optional[str] = Header(None)):
     # request body, which matches the behaviour expected by Alpaca's REST API.
     tc.cancel_order_by_id(order_id)
 
-    # The Alpaca REST API returns HTTP 204 with an empty body on success, so
-    # mirror that behaviour for the FastAPI route.
+    # The decorator defines a 204 status code, so simply return an empty response.
     return Response(status_code=204)
 
 # -- Account

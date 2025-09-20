@@ -39,7 +39,7 @@ paths:
       responses:
         "200": { description: Order detail }
     delete:
-      summary: Cancel order by ID
+      summary: Cancel order
       operationId: cancelOrderById
       security: [{ ApiKeyAuth: [] }]
       parameters:
