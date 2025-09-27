@@ -1,10 +1,14 @@
 from advanced_orders import router as advanced_orders_router
+import asyncio
 import json
 import os
-import uuid
+import random
 import re
+import time
+import uuid
 from datetime import datetime
 from typing import List, Optional
+
 import aiohttp
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -26,6 +30,7 @@ from alpaca.data.requests import (
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 from alpaca_client import AlpacaClient
 from config import APCA_API_BASE_URL
+from preflight import evaluate_limit_guard
 
 ALPACA_API_BASE_URL = APCA_API_BASE_URL
 ALPACA_KEY_ID = (
@@ -71,6 +76,75 @@ def _alpaca_headers():
         "APCA-API-KEY-ID": key_id,
         "APCA-API-SECRET-KEY": secret_key,
     }
+
+
+def _enforce_ext_policy(payload: dict):
+    """
+    If ALPHA_ENFORCE_EXT=1:
+      - When extended_hours=True:
+          * require type=limit and time_in_force=day
+          * forbid order_class in {'bracket','trailing'}
+      - For any limit order: apply TTL/drift gate
+    Soft-fail on quote fetch errors to avoid breaking flows.
+    """
+    if os.getenv("ALPHA_ENFORCE_EXT") != "1":
+        return
+    if payload.get("extended_hours"):
+        if (payload.get("type", "").lower() != "limit") or (
+            payload.get("time_in_force", "").lower() != "day"
+        ):
+            raise HTTPException(status_code=400, detail="EXT requires limit + day")
+        oc = (payload.get("order_class") or "").lower()
+        if oc in {"bracket", "trailing"}:
+            raise HTTPException(status_code=400, detail="Brackets/Trailing forbidden in EXT")
+    if (payload.get("type") or "").lower() == "limit" and payload.get("limit_price") is not None:
+        res = evaluate_limit_guard(
+            symbol=payload["symbol"],
+            limit_price=float(payload["limit_price"]),
+        )
+        if not res["ok"]:
+            if res["reason"] == "stale":
+                raise HTTPException(
+                    status_code=428,
+                    detail=f"Quote stale age={res['age']}s; refresh",
+                )
+            if res["reason"] == "drift":
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Price drift {res['drift']:.4%} exceeds limit",
+                )
+
+
+async def _request_with_retry(
+    session: aiohttp.ClientSession, method: str, url: str, **kwargs
+) -> aiohttp.ClientResponse:
+    """
+    Single retry on 5xx with small jitter. Bubble 429 with Retry-After if present.
+    Returns aiohttp.ClientResponse (caller is expected to consume it).
+    """
+    for attempt in (0, 1):
+        response = await session.request(method, url, **kwargs)
+        if response.status == 429:
+            retry_after = response.headers.get("Retry-After")
+            if not retry_after:
+                try:
+                    reset_epoch = int(response.headers.get("X-RateLimit-Reset", "0"))
+                    retry_after = str(max(0, reset_epoch - int(time.time())))
+                except Exception:
+                    retry_after = None
+            body = await response.text()
+            await response.release()
+            raise HTTPException(
+                status_code=429,
+                detail=body,
+                headers={"Retry-After": retry_after} if retry_after else None,
+            )
+        if 500 <= response.status < 600 and attempt == 0:
+            await response.release()
+            await asyncio.sleep(0.2 + random.random() * 0.3)
+            continue
+        return response
+    return response
 
 
 app.include_router(advanced_orders_router)
@@ -150,6 +224,16 @@ def submit_order(order: OrderIn, x_api_key: Optional[str] = Header(None)):
     side = OrderSide.BUY if order.side.lower() == "buy" else OrderSide.SELL
     tif = TimeInForce(order.time_in_force.lower())
     cid = _resolve_client_order_id(getattr(order, "client_order_id", None))
+    _enforce_ext_policy(
+        {
+            "symbol": order.symbol,
+            "type": order.type,
+            "time_in_force": order.time_in_force,
+            "extended_hours": getattr(order, "extended_hours", False),
+            "order_class": getattr(order, "order_class", None),
+            "limit_price": order.limit_price,
+        }
+    )
     if order.type.lower() == "market":
         kwargs: dict = {
             "symbol": order.symbol,
@@ -193,23 +277,32 @@ async def order_create(
         if os.getenv("ALPHA_REQUIRE_CLIENT_ID") == "1":
             raise HTTPException(status_code=400, detail="client_order_id required")
         payload["client_order_id"] = str(uuid.uuid4())
+    _enforce_ext_policy(payload)
     async with aiohttp.ClientSession(headers=_alpaca_headers()) as session:
-        async with session.post(f"{ALPACA_API_BASE_URL}/v2/orders", json=payload) as r:
+        r = await _request_with_retry(
+            session, "POST", f"{ALPACA_API_BASE_URL}/v2/orders", json=payload
+        )
+        try:
             body = await r.text()
             if r.status >= 400:
                 raise HTTPException(status_code=r.status, detail=body)
-            return await r.json()
+            return json.loads(body) if body else None
+        finally:
+            await r.release()
 
 
 @app.get("/v2/account")
 async def account_get(x_api_key: Optional[str] = Header(None, alias="x-api-key")):
     _require_gateway_key(x_api_key)
     async with aiohttp.ClientSession(headers=_alpaca_headers()) as session:
-        async with session.get(f"{ALPACA_API_BASE_URL}/v2/account") as r:
+        r = await _request_with_retry(session, "GET", f"{ALPACA_API_BASE_URL}/v2/account")
+        try:
             body = await r.text()
             if r.status >= 400:
                 raise HTTPException(status_code=r.status, detail=body)
-            return await r.json()
+            return json.loads(body) if body else None
+        finally:
+            await r.release()
 
 
 @app.get("/v2/orders")
@@ -220,13 +313,16 @@ async def orders_list(
     _require_gateway_key(x_api_key)
     params = {"status": status} if status else None
     async with aiohttp.ClientSession(headers=_alpaca_headers()) as session:
-        async with session.get(
-            f"{ALPACA_API_BASE_URL}/v2/orders", params=params
-        ) as r:
+        r = await _request_with_retry(
+            session, "GET", f"{ALPACA_API_BASE_URL}/v2/orders", params=params
+        )
+        try:
             body = await r.text()
             if r.status >= 400:
                 raise HTTPException(status_code=r.status, detail=body)
-            return await r.json()
+            return json.loads(body) if body else None
+        finally:
+            await r.release()
 
 
 @app.get("/v2/orders/{order_id}")
@@ -235,13 +331,16 @@ async def orders_get_by_id(
 ):
     _require_gateway_key(x_api_key)
     async with aiohttp.ClientSession(headers=_alpaca_headers()) as session:
-        async with session.get(
-            f"{ALPACA_API_BASE_URL}/v2/orders/{order_id}"
-        ) as r:
+        r = await _request_with_retry(
+            session, "GET", f"{ALPACA_API_BASE_URL}/v2/orders/{order_id}"
+        )
+        try:
             body = await r.text()
             if r.status >= 400:
                 raise HTTPException(status_code=r.status, detail=body)
-            return await r.json()
+            return json.loads(body) if body else None
+        finally:
+            await r.release()
 
 
 @app.get("/v2/positions")
@@ -315,11 +414,13 @@ async def _proxy_alpaca_request(
 ):
     _require_gateway_key(x_api_key)
     async with aiohttp.ClientSession(headers=_alpaca_headers()) as session:
-        async with session.request(
+        response = await _request_with_retry(
+            session,
             method,
             f"{ALPACA_API_BASE_URL}{path}",
             json=payload,
-        ) as response:
+        )
+        try:
             status = response.status
             content_type = response.headers.get("Content-Type") or ""
             text = await response.text()
@@ -342,6 +443,8 @@ async def _proxy_alpaca_request(
                 content=text,
                 media_type=content_type or "text/plain",
             )
+        finally:
+            await response.release()
 
 
 @app.get("/v2/watchlists")
@@ -443,12 +546,15 @@ async def cancelOrderById_v2(
 
     _require_gateway_key(x_api_key)
     async with aiohttp.ClientSession(headers=_alpaca_headers()) as session:
-        async with session.delete(
-            f"{ALPACA_API_BASE_URL}/v2/orders/{order_id}"
-        ) as r:
+        r = await _request_with_retry(
+            session, "DELETE", f"{ALPACA_API_BASE_URL}/v2/orders/{order_id}"
+        )
+        try:
             if r.status >= 400:
                 body = await r.text()
                 raise HTTPException(status_code=r.status, detail=body)
+        finally:
+            await r.release()
     return Response(status_code=204)
 
 # -- Account

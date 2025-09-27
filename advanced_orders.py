@@ -5,7 +5,16 @@ from typing import Optional, Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel
+# Validator compatibility: support both pydantic v1 (root_validator) and v2 (model_validator)
+try:
+    from pydantic import root_validator as _root_validator  # type: ignore
+except Exception:  # pragma: no cover - depends on pydantic version
+    _root_validator = None
+try:
+    from pydantic import model_validator as _model_validator  # type: ignore
+except Exception:  # pragma: no cover - depends on pydantic version
+    _model_validator = None
 
 from config import is_paper
 
@@ -27,6 +36,18 @@ def _client() -> TradingClient:
     key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY_ID")
     sec = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_API_SECRET_KEY")
     return TradingClient(key, sec, paper=is_paper())
+
+
+def _enforce_ext_policy_for_advanced(kind: str, extended: bool):
+    """
+    If ALPHA_ENFORCE_EXT=1 and extended_hours=True:
+      - reject bracket and trailing orders entirely.
+    """
+    if os.getenv("ALPHA_ENFORCE_EXT") == "1" and extended:
+        if kind == "bracket":
+            raise HTTPException(status_code=400, detail="Brackets forbidden in EXT")
+        if kind == "trailing":
+            raise HTTPException(status_code=400, detail="Trailing forbidden in EXT")
 
 
 def _resolve_client_order_id(maybe_id: Optional[str]) -> str:
@@ -71,13 +92,24 @@ class BracketOrderBody(BaseModel):
     extended_hours: Optional[bool] = False
     client_order_id: Optional[str] = None
 
-    @root_validator(skip_on_failure=True)
-    def _qty_notional_and_limit(cls, v):
-        if (v.get("qty") is None) == (v.get("notional") is None):
-            raise ValueError("Provide exactly one of qty or notional")
-        if v.get("type") == "limit" and v.get("limit_price") is None:
-            raise ValueError("limit_price is required for limit entry")
-        return v
+    if _root_validator:
+        @_root_validator(skip_on_failure=True)
+        def _qty_notional_and_limit(cls, v):
+            if (v.get("qty") is None) == (v.get("notional") is None):
+                raise ValueError("Provide exactly one of qty or notional")
+            if v.get("type") == "limit" and v.get("limit_price") is None:
+                raise ValueError("limit_price is required for limit entry")
+            _enforce_ext_policy_for_advanced("bracket", bool(v.get("extended_hours")))
+            return v
+    elif _model_validator:
+        @_model_validator(mode="after")
+        def _qty_notional_and_limit(self):
+            if (self.qty is None) == (self.notional is None):
+                raise ValueError("Provide exactly one of qty or notional")
+            if self.type == "limit" and self.limit_price is None:
+                raise ValueError("limit_price is required for limit entry")
+            _enforce_ext_policy_for_advanced("bracket", bool(self.extended_hours))
+            return self
 
 def _submit(req):
     try:
@@ -153,11 +185,18 @@ class StopOrderBody(BaseModel):
     extended_hours: Optional[bool] = False
     client_order_id: Optional[str] = None
 
-    @root_validator(skip_on_failure=True)
-    def _qty_xor_notional(cls, v):
-        if (v.get("qty") is None) == (v.get("notional") is None):
-            raise ValueError("Provide exactly one of qty or notional")
-        return v
+    if _root_validator:
+        @_root_validator(skip_on_failure=True)
+        def _qty_xor_notional(cls, v):
+            if (v.get("qty") is None) == (v.get("notional") is None):
+                raise ValueError("Provide exactly one of qty or notional")
+            return v
+    elif _model_validator:
+        @_model_validator(mode="after")
+        def _qty_xor_notional(self):
+            if (self.qty is None) == (self.notional is None):
+                raise ValueError("Provide exactly one of qty or notional")
+            return self
 
 @router.post("/v1/order/stop", tags=["Orders"])
 def place_stop(body: StopOrderBody):
@@ -185,14 +224,28 @@ class TrailingOrderBody(BaseModel):
     extended_hours: Optional[bool] = False
     client_order_id: Optional[str] = None
 
-    @root_validator(skip_on_failure=True)
-    def _validate_trail(cls, v):
-        tp = v.get("trail_price"); pc = v.get("trail_percent")
-        if (tp is None and pc is None) or (tp is not None and pc is not None):
-            raise ValueError("Provide either trail_price or trail_percent, not both")
-        if (v.get("qty") is None) == (v.get("notional") is None):
-            raise ValueError("Provide exactly one of qty or notional")
-        return v
+    if _root_validator:
+        @_root_validator(skip_on_failure=True)
+        def _validate_trail(cls, v):
+            tp = v.get("trail_price")
+            pc = v.get("trail_percent")
+            if (tp is None and pc is None) or (tp is not None and pc is not None):
+                raise ValueError("Provide either trail_price or trail_percent, not both")
+            if (v.get("qty") is None) == (v.get("notional") is None):
+                raise ValueError("Provide exactly one of qty or notional")
+            _enforce_ext_policy_for_advanced("trailing", bool(v.get("extended_hours")))
+            return v
+    elif _model_validator:
+        @_model_validator(mode="after")
+        def _validate_trail(self):
+            if (self.trail_price is None and self.trail_percent is None) or (
+                self.trail_price is not None and self.trail_percent is not None
+            ):
+                raise ValueError("Provide either trail_price or trail_percent, not both")
+            if (self.qty is None) == (self.notional is None):
+                raise ValueError("Provide exactly one of qty or notional")
+            _enforce_ext_policy_for_advanced("trailing", bool(self.extended_hours))
+            return self
 
 @router.post("/v1/order/trailing", tags=["Orders"])
 def place_trailing(body: TrailingOrderBody):
