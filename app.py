@@ -24,10 +24,19 @@ from alpaca.data.requests import (
 )
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 from alpaca_client import AlpacaClient
+from config import APCA_API_BASE_URL
 
-ALPACA_API_BASE_URL = os.getenv("ALPACA_API_BASE_URL", "https://api.alpaca.markets")
-ALPACA_KEY_ID = os.getenv("ALPACA_KEY_ID") or os.getenv("APCA_API_KEY_ID")
-ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY") or os.getenv("APCA_API_SECRET_KEY")
+ALPACA_API_BASE_URL = APCA_API_BASE_URL
+ALPACA_KEY_ID = (
+    os.getenv("ALPACA_KEY_ID")
+    or os.getenv("ALPACA_API_KEY_ID")
+    or os.getenv("APCA_API_KEY_ID")
+)
+ALPACA_SECRET_KEY = (
+    os.getenv("ALPACA_SECRET_KEY")
+    or os.getenv("ALPACA_API_SECRET_KEY")
+    or os.getenv("APCA_API_SECRET_KEY")
+)
 GATEWAY_API_KEY = os.getenv("GATEWAY_API_KEY") or os.getenv("X_API_KEY")
 
 app = FastAPI(title="Alpaca Wrapper", version="1.0.3")
@@ -59,10 +68,9 @@ def trading_client() -> TradingClient:
     return AlpacaClient.from_env().client
 
 def md_client() -> StockHistoricalDataClient:
-    return StockHistoricalDataClient(
-        api_key=os.environ["APCA_API_KEY_ID"],
-        secret_key=os.environ["APCA_API_SECRET_KEY"]
-    )
+    api_key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY_ID")
+    secret_key = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_API_SECRET_KEY")
+    return StockHistoricalDataClient(api_key=api_key, secret_key=secret_key)
 
 class OrderIn(BaseModel):
     symbol: str
@@ -72,6 +80,7 @@ class OrderIn(BaseModel):
     type: str
     time_in_force: str
     limit_price: float | None = None
+    client_order_id: Optional[str] = None
 
 
 class CreateOrder(BaseModel):
@@ -126,13 +135,29 @@ def submit_order(order: OrderIn, x_api_key: Optional[str] = Header(None)):
     side = OrderSide.BUY if order.side.lower() == "buy" else OrderSide.SELL
     tif = TimeInForce(order.time_in_force.lower())
     if order.type.lower() == "market":
-        req = MarketOrderRequest(symbol=order.symbol, qty=order.qty, notional=order.notional,
-                                 side=side, time_in_force=tif)
+        kwargs = {
+            "symbol": order.symbol,
+            "qty": order.qty,
+            "notional": order.notional,
+            "side": side,
+            "time_in_force": tif,
+        }
+        if getattr(order, "client_order_id", None) is not None:
+            kwargs["client_order_id"] = order.client_order_id
+        req = MarketOrderRequest(**kwargs)
     elif order.type.lower() == "limit":
         if order.limit_price is None:
             raise HTTPException(400, "limit_price required for limit orders")
-        req = LimitOrderRequest(symbol=order.symbol, qty=order.qty,
-                                side=side, time_in_force=tif, limit_price=order.limit_price)
+        kwargs = {
+            "symbol": order.symbol,
+            "qty": order.qty,
+            "side": side,
+            "time_in_force": tif,
+            "limit_price": order.limit_price,
+        }
+        if getattr(order, "client_order_id", None) is not None:
+            kwargs["client_order_id"] = order.client_order_id
+        req = LimitOrderRequest(**kwargs)
     else:
         raise HTTPException(400, "unsupported order type")
     o = tc.submit_order(order_data=req)

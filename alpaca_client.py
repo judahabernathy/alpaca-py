@@ -4,6 +4,7 @@ import os
 
 from alpaca.common.exceptions import APIError
 from alpaca.trading.client import TradingClient
+from config import is_paper
 
 
 class AlpacaClient:
@@ -20,10 +21,11 @@ class AlpacaClient:
     def from_env(cls) -> "AlpacaClient":
         """Instantiate the client using standard Alpaca environment variables."""
 
-        api_key = os.environ["APCA_API_KEY_ID"]
-        secret_key = os.environ["APCA_API_SECRET_KEY"]
-        base_url = os.environ.get("APCA_API_BASE_URL", "")
-        paper = "paper" in base_url.lower()
+        # Be tolerant of either APCA_/ALPACA_ naming conventions.
+        api_key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY_ID")
+        secret_key = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_API_SECRET_KEY")
+        # Default to paper; detect live only if base URL says so
+        paper = is_paper()
         return cls(api_key=api_key, secret_key=secret_key, paper=paper)
 
     def get_account(self) -> dict:
