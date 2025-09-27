@@ -1,6 +1,7 @@
 from advanced_orders import router as advanced_orders_router
 import json
 import os
+import uuid
 import re
 from datetime import datetime
 from typing import List, Optional
@@ -40,6 +41,20 @@ ALPACA_SECRET_KEY = (
 GATEWAY_API_KEY = os.getenv("GATEWAY_API_KEY") or os.getenv("X_API_KEY")
 
 app = FastAPI(title="Alpaca Wrapper", version="1.0.3")
+
+
+def _resolve_client_order_id(maybe_id: Optional[str]) -> str:
+    """
+    Transitional idempotency policy:
+    - If ALPHA_REQUIRE_CLIENT_ID=1 and id is missing -> 400
+    - Else generate UUIDv4 and use it
+    """
+    if maybe_id:
+        return maybe_id
+    if os.getenv("ALPHA_REQUIRE_CLIENT_ID") == "1":
+        # caller must supply a stable id
+        raise HTTPException(status_code=400, detail="client_order_id required")
+    return str(uuid.uuid4())
 
 
 def _require_gateway_key(x_api_key: Optional[str]):
@@ -134,29 +149,28 @@ def submit_order(order: OrderIn, x_api_key: Optional[str] = Header(None)):
     tc = trading_client()
     side = OrderSide.BUY if order.side.lower() == "buy" else OrderSide.SELL
     tif = TimeInForce(order.time_in_force.lower())
+    cid = _resolve_client_order_id(getattr(order, "client_order_id", None))
     if order.type.lower() == "market":
-        kwargs = {
+        kwargs: dict = {
             "symbol": order.symbol,
             "qty": order.qty,
             "notional": order.notional,
             "side": side,
             "time_in_force": tif,
         }
-        if getattr(order, "client_order_id", None) is not None:
-            kwargs["client_order_id"] = order.client_order_id
+        kwargs["client_order_id"] = cid
         req = MarketOrderRequest(**kwargs)
     elif order.type.lower() == "limit":
         if order.limit_price is None:
             raise HTTPException(400, "limit_price required for limit orders")
-        kwargs = {
+        kwargs: dict = {
             "symbol": order.symbol,
             "qty": order.qty,
             "side": side,
             "time_in_force": tif,
             "limit_price": order.limit_price,
         }
-        if getattr(order, "client_order_id", None) is not None:
-            kwargs["client_order_id"] = order.client_order_id
+        kwargs["client_order_id"] = cid
         req = LimitOrderRequest(**kwargs)
     else:
         raise HTTPException(400, "unsupported order type")
@@ -174,6 +188,11 @@ async def order_create(
         if hasattr(order, "model_dump")
         else order.dict(exclude_none=True)
     )
+    # Transitional id policy: require or generate
+    if not payload.get("client_order_id"):
+        if os.getenv("ALPHA_REQUIRE_CLIENT_ID") == "1":
+            raise HTTPException(status_code=400, detail="client_order_id required")
+        payload["client_order_id"] = str(uuid.uuid4())
     async with aiohttp.ClientSession(headers=_alpaca_headers()) as session:
         async with session.post(f"{ALPACA_API_BASE_URL}/v2/orders", json=payload) as r:
             body = await r.text()

@@ -1,4 +1,5 @@
 import os
+import uuid
 import requests
 from typing import Optional, Literal
 
@@ -26,6 +27,14 @@ def _client() -> TradingClient:
     key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY_ID")
     sec = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_API_SECRET_KEY")
     return TradingClient(key, sec, paper=is_paper())
+
+
+def _resolve_client_order_id(maybe_id: Optional[str]) -> str:
+    if maybe_id:
+        return maybe_id
+    if os.getenv("ALPHA_REQUIRE_CLIENT_ID") == "1":
+        raise HTTPException(status_code=400, detail="client_order_id required")
+    return str(uuid.uuid4())
 
 def _side(s: str) -> OrderSide:
     s = (s or "").lower()
@@ -103,6 +112,7 @@ def place_bracket(body: BracketOrderBody):
     tif = _tif(body.time_in_force)
     tp = TakeProfitRequest(limit_price=body.take_profit.limit_price)
     sl = StopLossRequest(stop_price=body.stop_loss.stop_price, limit_price=body.stop_loss.limit_price)
+    cid = _resolve_client_order_id(body.client_order_id)
 
     if body.type == "market":
         req = MarketOrderRequest(
@@ -115,7 +125,7 @@ def place_bracket(body: BracketOrderBody):
             take_profit=tp,
             stop_loss=sl,
             extended_hours=body.extended_hours,
-            client_order_id=body.client_order_id,
+            client_order_id=cid,
         )
     else:
         req = LimitOrderRequest(
@@ -129,7 +139,7 @@ def place_bracket(body: BracketOrderBody):
             take_profit=tp,
             stop_loss=sl,
             extended_hours=body.extended_hours,
-            client_order_id=body.client_order_id,
+            client_order_id=cid,
         )
     return jsonable_encoder(_submit(req))
 
@@ -151,6 +161,7 @@ class StopOrderBody(BaseModel):
 
 @router.post("/v1/order/stop", tags=["Orders"])
 def place_stop(body: StopOrderBody):
+    cid = _resolve_client_order_id(body.client_order_id)
     req = StopOrderRequest(
         symbol=body.symbol,
         side=_side(body.side),
@@ -159,7 +170,7 @@ def place_stop(body: StopOrderBody):
         notional=body.notional,
         stop_price=body.stop_price,
         extended_hours=body.extended_hours,
-        client_order_id=body.client_order_id,
+        client_order_id=cid,
     )
     return jsonable_encoder(_submit(req))
 
@@ -185,6 +196,7 @@ class TrailingOrderBody(BaseModel):
 
 @router.post("/v1/order/trailing", tags=["Orders"])
 def place_trailing(body: TrailingOrderBody):
+    cid = _resolve_client_order_id(body.client_order_id)
     req = TrailingStopOrderRequest(
         symbol=body.symbol,
         side=_side(body.side),
@@ -194,6 +206,6 @@ def place_trailing(body: TrailingOrderBody):
         trail_price=body.trail_price,
         trail_percent=body.trail_percent,
         extended_hours=body.extended_hours,
-        client_order_id=body.client_order_id,
+        client_order_id=cid,
     )
     return jsonable_encoder(_submit(req))
