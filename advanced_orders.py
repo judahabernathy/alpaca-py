@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, root_validator
 
+from config import is_paper
+
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass
 from alpaca.trading.requests import (
@@ -21,10 +23,9 @@ from alpaca.common.exceptions import APIError
 router = APIRouter()
 
 def _client() -> TradingClient:
-    key = os.getenv("APCA_API_KEY_ID")
-    sec = os.getenv("APCA_API_SECRET_KEY")
-    paper = "paper" in (os.getenv("APCA_API_BASE_URL", "") or "").lower()
-    return TradingClient(key, sec, paper=paper)
+    key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY_ID")
+    sec = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_API_SECRET_KEY")
+    return TradingClient(key, sec, paper=is_paper())
 
 def _side(s: str) -> OrderSide:
     s = (s or "").lower()
