@@ -7,7 +7,7 @@ import re
 import time
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 from fastapi import FastAPI, Header, HTTPException, Query
@@ -21,7 +21,7 @@ from alpaca.trading.requests import (
     LimitOrderRequest,
     StopOrderRequest,
     CreateWatchlistRequest,
-    UpdateWatchlistRequest
+    UpdateWatchlistRequest,
 )
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import (
@@ -115,6 +115,88 @@ def _enforce_ext_policy(payload: dict):
                 )
 
 
+def _json_default(value: Any) -> str:
+    return repr(value)
+
+
+def _drop_nones(data: Dict[str, Any]) -> Dict[str, Any]:
+    return {k: v for k, v in data.items() if v is not None}
+
+
+def _order_to_dict(order: Any) -> Any:
+    if hasattr(order, "model_dump"):
+        return order.model_dump()
+    if hasattr(order, "dict"):
+        return order.dict()
+    return getattr(order, "__dict__", order)
+
+
+def _journal_event(event: str, payload: Dict[str, Any]) -> None:
+    sink = os.getenv("ALPHA_ORDER_JOURNAL")
+    if not sink:
+        return
+    entry = {
+        "ts": datetime.utcnow().isoformat() + "Z",
+        "event": event,
+        "payload": payload,
+    }
+    try:
+        serialized = json.dumps(entry, default=_json_default)
+        if sink.lower() == "stdout":
+            print(serialized)
+        else:
+            with open(sink, "a", encoding="utf-8") as fh:
+                fh.write(serialized + "\n")
+    except Exception:
+        # Journaling is best-effort; ignore all errors.
+        pass
+
+
+def _create_order_with_idempotency(
+    client: TradingClient, request: Any, client_order_id: str
+):
+    try:
+        return client.submit_order(order_data=request)
+    except APIError as api_error:
+        status = getattr(api_error, "status_code", None)
+        _journal_event(
+            "OrderSubmitError",
+            {
+                "phase": "submit",
+                "status_code": status,
+                "message": str(api_error),
+            },
+        )
+        retriable = status is None or status >= 500
+        if retriable:
+            try:
+                existing = client.get_order_by_client_id(client_order_id)
+            except Exception as lookup_error:
+                _journal_event(
+                    "OrderLookupFailed",
+                    {
+                        "phase": "retry",
+                        "status_code": getattr(lookup_error, "status_code", None),
+                        "message": str(lookup_error),
+                    },
+                )
+            else:
+                if existing is not None:
+                    payload = _order_to_dict(existing)
+                    _journal_event(
+                        "OrderRecovered",
+                        {"phase": "retry", "order": payload},
+                    )
+                    return existing
+        raise
+    except Exception as error:
+        _journal_event(
+            "OrderSubmitError",
+            {"phase": "submit", "message": str(error)},
+        )
+        raise
+
+
 async def _request_with_retry(
     session: aiohttp.ClientSession, method: str, url: str, **kwargs
 ) -> aiohttp.ClientResponse:
@@ -170,6 +252,8 @@ class OrderIn(BaseModel):
     time_in_force: str
     limit_price: float | None = None
     client_order_id: Optional[str] = None
+    extended_hours: bool | None = None
+    order_class: str | None = None
 
 
 class CreateOrder(BaseModel):
@@ -220,46 +304,52 @@ def healthz(): return {"ok": True}
 @app.post("/v1/order")
 def submit_order(order: OrderIn, x_api_key: Optional[str] = Header(None)):
     check_key(x_api_key)
+    payload = (
+        order.model_dump()
+        if hasattr(order, "model_dump")
+        else order.dict()
+    )
+
+    _journal_event("OrderValidation", {"phase": "pre-submit", "payload": payload})
+
+    client_order_id = _resolve_client_order_id(payload.get("client_order_id"))
+    payload["client_order_id"] = client_order_id
+
+    _enforce_ext_policy(payload)
+
     tc = trading_client()
     side = OrderSide.BUY if order.side.lower() == "buy" else OrderSide.SELL
     tif = TimeInForce(order.time_in_force.lower())
-    cid = _resolve_client_order_id(getattr(order, "client_order_id", None))
-    _enforce_ext_policy(
+
+    base_kwargs = _drop_nones(
         {
-            "symbol": order.symbol,
-            "type": order.type,
-            "time_in_force": order.time_in_force,
-            "extended_hours": getattr(order, "extended_hours", False),
-            "order_class": getattr(order, "order_class", None),
-            "limit_price": order.limit_price,
-        }
-    )
-    if order.type.lower() == "market":
-        kwargs: dict = {
             "symbol": order.symbol,
             "qty": order.qty,
             "notional": order.notional,
             "side": side,
             "time_in_force": tif,
+            "extended_hours": payload.get("extended_hours"),
+            "client_order_id": client_order_id,
+            "order_class": payload.get("order_class"),
         }
-        kwargs["client_order_id"] = cid
-        req = MarketOrderRequest(**kwargs)
-    elif order.type.lower() == "limit":
+    )
+
+    order_type = order.type.lower()
+    if order_type == "market":
+        req = MarketOrderRequest(**base_kwargs)
+    elif order_type == "limit":
         if order.limit_price is None:
             raise HTTPException(400, "limit_price required for limit orders")
-        kwargs: dict = {
-            "symbol": order.symbol,
-            "qty": order.qty,
-            "side": side,
-            "time_in_force": tif,
-            "limit_price": order.limit_price,
-        }
-        kwargs["client_order_id"] = cid
-        req = LimitOrderRequest(**kwargs)
+        limit_kwargs = dict(base_kwargs)
+        limit_kwargs["limit_price"] = order.limit_price
+        req = LimitOrderRequest(**limit_kwargs)
     else:
         raise HTTPException(400, "unsupported order type")
-    o = tc.submit_order(order_data=req)
-    return o.model_dump() if hasattr(o, "model_dump") else o.__dict__
+
+    created_order = _create_order_with_idempotency(tc, req, client_order_id)
+    model = _order_to_dict(created_order)
+    _journal_event("JournalEntry", {"phase": "post-success", "order": model})
+    return model
 
 
 @app.post("/v2/orders")
