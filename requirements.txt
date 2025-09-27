@@ -7,3 +7,7 @@ uvicorn[standard]
 alpaca-py
 pandas
 python-dotenv
+aiohttp
+PyYAML
+requests-mock
+pytest-asyncio

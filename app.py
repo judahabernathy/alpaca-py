@@ -1,7 +1,12 @@
 import os
 import re
+import asyncio
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Any, Dict, Coroutine
+from uuid import uuid4
+
+import aiohttp
+import config
 from fastapi import FastAPI, Header, HTTPException, Query, Path, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -17,6 +22,139 @@ from alpaca.data.requests import (
 )
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
+DEFAULT_LIMIT_GUARD_RESULT: Dict[str, Any] = {
+    "ok": True,
+    "reason": None,
+    "age": None,
+    "drift": None,
+    "debug": {},
+    "message": None,
+}
+
+
+def _resolve_client_order_id(candidate: Optional[str]) -> str:
+    if candidate:
+        return candidate
+    if os.getenv("ALPHA_REQUIRE_CLIENT_ID"):
+        raise HTTPException(status_code=400, detail="client_order_id required")
+    return uuid4().hex
+
+
+async def _request_with_retry(
+    session: aiohttp.ClientSession,
+    method: str,
+    url: str,
+    *,
+    retries: int = 3,
+    backoff: float = 0.5,
+    **kwargs,
+) -> aiohttp.ClientResponse:
+    attempt = 0
+    while True:
+        response = await session.request(method, url, **kwargs)
+        if response.status == 429:
+            body = await response.text()
+            retry_after = response.headers.get("Retry-After")
+            await response.release()
+            if attempt >= retries - 1:
+                detail = {
+                    "message": body or "Rate limited",
+                    "retry_after": retry_after,
+                }
+                raise HTTPException(status_code=429, detail=detail)
+            delay = float(retry_after or backoff)
+            await asyncio.sleep(delay)
+            attempt += 1
+            backoff *= 2
+            continue
+        if response.status >= 400:
+            body = await response.text()
+            await response.release()
+            raise HTTPException(status_code=response.status, detail=body or response.reason)
+        return response
+
+
+def _run_coroutine(coro: Coroutine[Any, Any, Any]) -> Any:
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+def evaluate_limit_guard(**payload: Any) -> Dict[str, Any]:
+    url = os.getenv("ALPHA_LIMIT_GUARD_URL")
+    if not url:
+        return dict(DEFAULT_LIMIT_GUARD_RESULT)
+
+    timeout = aiohttp.ClientTimeout(total=float(os.getenv("ALPHA_LIMIT_GUARD_TIMEOUT", "2")))
+
+    async def _invoke() -> Dict[str, Any]:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            response = await _request_with_retry(session, "POST", url, json=payload)
+            try:
+                data = await response.json(content_type=None)
+            except aiohttp.ContentTypeError:
+                text = await response.text()
+                await response.release()
+                raise HTTPException(status_code=502, detail=f"Invalid JSON from guard: {text}")
+            await response.release()
+            return data
+
+    try:
+        data = _run_coroutine(_invoke())
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - fallback path
+        result = dict(DEFAULT_LIMIT_GUARD_RESULT)
+        result["debug"] = {"error": str(exc)}
+        return result
+
+    result = dict(DEFAULT_LIMIT_GUARD_RESULT)
+    result.update({k: data.get(k) for k in ["ok", "reason", "age", "drift", "debug", "message"] if k in data})
+    return result
+
+
+def _enforce_ext_policy(payload: Dict[str, Any]) -> None:
+    if not os.getenv("ALPHA_ENFORCE_EXT"):
+        return
+
+    order_type = (payload.get("type") or "").lower()
+    tif = (payload.get("time_in_force") or "").lower()
+    extended = bool(payload.get("extended_hours"))
+    order_class = (payload.get("order_class") or "").lower() if payload.get("order_class") else None
+
+    if extended:
+        if order_type != "limit":
+            raise HTTPException(status_code=400, detail="Extended hours orders must be limit orders")
+        if tif != "day":
+            raise HTTPException(status_code=400, detail="Extended hours orders require day time_in_force")
+        if payload.get("limit_price") is None:
+            raise HTTPException(status_code=400, detail="limit_price required for extended hours orders")
+        if order_class:
+            raise HTTPException(status_code=400, detail="Extended hours orders do not support advanced order classes")
+
+    if order_type == "limit":
+        guard_result = evaluate_limit_guard(
+            symbol=payload.get("symbol"),
+            limit_price=payload.get("limit_price"),
+            side=payload.get("side"),
+            extended_hours=extended,
+            time_in_force=tif,
+        )
+        if not guard_result.get("ok", True):
+            reason = (guard_result.get("reason") or "limit_guard").lower()
+            status_map = {"stale": 428, "ttl": 428, "drift": 409}
+            status = status_map.get(reason, 400)
+            detail = {
+                "message": guard_result.get("message") or f"Limit order blocked: {reason}",
+                "reason": reason,
+                "age": guard_result.get("age"),
+                "drift": guard_result.get("drift"),
+                "debug": guard_result.get("debug"),
+            }
+            raise HTTPException(status_code=status, detail=detail)
+
 app = FastAPI(title="Alpaca Wrapper")
 
 def check_key(x_api_key: Optional[str]):
@@ -25,10 +163,11 @@ def check_key(x_api_key: Optional[str]):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 def trading_client() -> TradingClient:
+    base_url = config.APCA_API_BASE_URL
     return TradingClient(
         api_key=os.environ["APCA_API_KEY_ID"],
         secret_key=os.environ["APCA_API_SECRET_KEY"],
-        paper=("paper" in os.environ.get("APCA_API_BASE_URL", ""))
+        paper=("paper" in base_url)
     )
 
 def md_client() -> StockHistoricalDataClient:
@@ -45,6 +184,9 @@ class OrderIn(BaseModel):
     type: str
     time_in_force: str
     limit_price: float | None = None
+    extended_hours: bool = False
+    order_class: Optional[str] = None
+    client_order_id: Optional[str] = None
 
 def parse_timeframe(tf_str: str) -> TimeFrame:
     m = re.match(r'^(\d+)([A-Za-z]+)$', tf_str)
@@ -71,12 +213,20 @@ def healthz(): return {"ok": True}
 @app.post("/v1/order")
 def submit_order(order: OrderIn, x_api_key: Optional[str] = Header(None)):
     check_key(x_api_key)
+    payload = order.model_dump()
+    _enforce_ext_policy(payload)
+    client_order_id = _resolve_client_order_id(payload.get("client_order_id"))
     tc = trading_client()
     side = OrderSide.BUY if order.side.lower() == "buy" else OrderSide.SELL
     tif = TimeInForce(order.time_in_force.lower())
     if order.type.lower() == "market":
-        req = MarketOrderRequest(symbol=order.symbol, qty=order.qty, notional=order.notional,
-                                 side=side, time_in_force=tif)
+        req = MarketOrderRequest(
+            symbol=order.symbol,
+            qty=order.qty,
+            notional=order.notional,
+            side=side,
+            time_in_force=tif,
+        )
     elif order.type.lower() == "limit":
         if order.limit_price is None:
             raise HTTPException(400, "limit_price required for limit orders")
@@ -84,6 +234,10 @@ def submit_order(order: OrderIn, x_api_key: Optional[str] = Header(None)):
                                 side=side, time_in_force=tif, limit_price=order.limit_price)
     else:
         raise HTTPException(400, "unsupported order type")
+    setattr(req, "client_order_id", client_order_id)
+    setattr(req, "extended_hours", order.extended_hours)
+    if order.order_class:
+        setattr(req, "order_class", order.order_class)
     o = tc.submit_order(order_data=req)
     return o.model_dump() if hasattr(o, "model_dump") else o.__dict__
 
