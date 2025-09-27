@@ -1,267 +1,103 @@
 openapi: 3.1.0
 info:
-  title: Alpaca Trading API (Live)
-  version: 1.1.1
+  title: Alpha Trading Edge
+  version: 2.0.0
 servers:
-  # Use your Railway wrapper; keep a single server to avoid multi-server import warnings.
   - url: https://alpaca-py-production.up.railway.app
-
-# Apply auth to all operations (one scheme only)
 security:
   - ApiKeyAuth: []
-paths:
-  /v2/orders:
-    post:
-      summary: Submit a new order
-      operationId: ordersCreate
-      # auth via top-level security
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/OrderIn"
-      responses:
-        "200":
-          description: Order created
-    get:
-      summary: List orders
-      operationId: ordersList
-      # auth via top-level security
-      parameters:
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            default: open
-      responses:
-        "200":
-          description: Orders list
-  /v2/orders/{order_id}:
-    get:
-      summary: Get order by ID
-      operationId: ordersGetById
-      # auth via top-level security
-      parameters:
-        - name: order_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Order detail
-    delete:
-      summary: Cancel order
-      operationId: ordersCancelById
-      # auth via top-level security
-      parameters:
-        - name: order_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "204":
-          description: Order cancelled
-  /v2/account:
-    get:
-      summary: Get account details
-      operationId: accountGet
-      # auth via top-level security
-      responses:
-        "200":
-          description: Account info
-  /v2/positions:
-    get:
-      summary: List open positions
-      operationId: positionsList
-      # auth via top-level security
-      responses:
-        "200":
-          description: Positions list
-    delete:
-      summary: Close all positions
-      operationId: positionsCloseAll
-      # auth via top-level security
-      parameters:
-        - name: cancel_orders
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
-      responses:
-        "200":
-          description: Positions closed
-  /v2/positions/{symbol}:
-    get:
-      summary: Get position
-      operationId: positionsGet
-      # auth via top-level security
-      parameters:
-        - name: symbol
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Position detail
-    delete:
-      summary: Close position
-      operationId: positionsClose
-      # auth via top-level security
-      parameters:
-        - name: symbol
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: cancel_orders
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
-      responses:
-        "200":
-          description: Position closed
-  /v2/watchlists:
-    get:
-      summary: List watchlists
-      tags: [watchlists]
-      operationId: watchlistsList
-      # auth via top-level security
-      responses:
-        "200":
-          description: Watchlists list
-    post:
-      summary: Create watchlist
-      tags: [watchlists]
-      operationId: watchlistsCreate
-      # auth via top-level security
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/WatchlistIn"
-      responses:
-        "200":
-          description: Watchlist created
-  /v2/watchlists/{watchlist_id}:
-    get:
-      summary: Get watchlist
-      tags: [watchlists]
-      operationId: watchlistsGet
-      # auth via top-level security
-      parameters:
-        - name: watchlist_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Watchlist detail
-    put:
-      summary: Update watchlist
-      tags: [watchlists]
-      operationId: watchlistsUpdate
-      # auth via top-level security
-      parameters:
-        - name: watchlist_id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/WatchlistIn"
-      responses:
-        "200":
-          description: Watchlist updated
-    delete:
-      summary: Delete watchlist
-      tags: [watchlists]
-      operationId: watchlistsDelete
-      # auth via top-level security
-      parameters:
-        - name: watchlist_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Watchlist deleted
 components:
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
       in: header
-      name: x-api-key
-  schemas:
-    OrderIn:
-      type: object
-      required: [symbol, side, type, time_in_force]
-      properties:
-        symbol:
-          type: string
-        side:
-          type: string
-          enum: [buy, sell]
-        type:
-          type: string
-          enum: [market, limit, stop, stop_limit, trailing_stop]
-        time_in_force:
-          type: string
-          enum: [day, gtc, opg, cls, ioc, fok]
-        qty:         { type: number }
-        notional:    { type: number }
-        limit_price: { type: number }
-        stop_price:  { type: number }
-        client_order_id:
-          type: string
-        extended_hours:
-          type: boolean
-          default: false
-        order_class:
-          type: string
-          enum: [simple, bracket, oco, oto]
-        take_profit:
-          type: object
-          properties:
-            limit_price: { type: number }
-          required: [limit_price]
-          additionalProperties: false
-        stop_loss:
-          type: object
-          properties:
-            stop_price:  { type: number }
-            limit_price: { type: number }
-          required: [stop_price]
-          additionalProperties: false
-        trail_price:   { type: number }
-        trail_percent: { type: number }
-      additionalProperties: false
-      oneOf:
-        - required: [qty]
-        - required: [notional]
-    WatchlistIn:
-      type: object
-      required:
-        - name
-        - symbols
-      properties:
-        name:
-          type: string
-        symbols:
-          type: array
-          items:
-            type: string
+      name: X-API-Key
+paths:
+  /v2/orders:
+    post:
+      summary: Create order
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema: { }
+        '400': { description: Bad Request }
+        '401': { description: Unauthorized }
+        '409': { description: Price drift exceeded }
+        '428': { description: Quote stale }
+  /v2/orders/{order_id}:
+    get:
+      summary: Get order
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { }
+    delete:
+      summary: Cancel order
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Cancelled }
+        '404': { description: Not Found }
+  /v2/watchlist:
+    get:
+      summary: List watchlists
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { }
+    post:
+      summary: Create watchlist
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+  /v2/watchlist/{id}:
+    get:
+      summary: Get watchlist
+      security: [ { ApiKeyAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses: { '200': { description: OK } }
+    delete:
+      summary: Delete watchlist
+      security: [ { ApiKeyAuth: [] } ]
+      parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
+      responses: { '204': { description: Deleted } }

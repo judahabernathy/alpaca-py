@@ -1,22 +1,59 @@
-import os, json, yaml
-from app import app
+#!/usr/bin/env python3
+import argparse
+import os
+import sys
+import yaml
 
-schema = app.openapi()
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--in", dest="inp", default="openapi.yaml")
+    parser.add_argument("--out", dest="out", default="-")
+    parser.add_argument(
+        "--full", action="store_true", help="optionally add advanced helpers"
+    )
+    args = parser.parse_args()
 
-base = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("RAILWAY_STATIC_URL") or "http://localhost:8000"
-schema["servers"] = [{"url": base}]
+    with open(args.inp, "r", encoding="utf-8") as f:
+        doc = yaml.safe_load(f)
 
-p = schema.get("paths", {})
-if "/v1/order/bracket"  in p and "post" in p["/v1/order/bracket"]:
-    p["/v1/order/bracket"]["post"]["operationId"]  = "placeBracketOrder"
-if "/v1/order/stop"     in p and "post" in p["/v1/order/stop"]:
-    p["/v1/order/stop"]["post"]["operationId"]     = "placeStopOrder"
-if "/v1/order/trailing" in p and "post" in p["/v1/order/trailing"]:
-    p["/v1/order/trailing"]["post"]["operationId"] = "placeTrailingStopOrder"
+    base = os.getenv("PUBLIC_BASE_URL")
+    if base:
+        if not doc.get("servers"):
+            doc["servers"] = [{"url": base}]
+        else:
+            doc["servers"][0]["url"] = base
 
-with open("openapi.json","w",encoding="utf-8") as f:
-    json.dump(schema, f, indent=2)
-with open("openapi.yaml","w",encoding="utf-8") as f:
-    yaml.safe_dump(schema, f, sort_keys=False, allow_unicode=True)
+    if args.full:
+        paths = doc.setdefault("paths", {})
+        paths.setdefault(
+            "/v2/orders:preview",
+            {
+                "post": {
+                    "summary": "Preview trade (advanced)",
+                    "security": [{"ApiKeyAuth": []}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"type": "object"}}
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {}}},
+                        }
+                    },
+                }
+            },
+        )
 
-print("Wrote openapi.json & openapi.yaml with servers[0].url =", base)
+    out = yaml.safe_dump(doc, sort_keys=False)
+    if args.out == "-" or not args.out:
+        sys.stdout.write(out)
+    else:
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(out)
+
+
+if __name__ == "__main__":
+    main()

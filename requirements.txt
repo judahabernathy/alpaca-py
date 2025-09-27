@@ -11,3 +11,5 @@ python-dotenv
 pydantic
 requests
 PyYAML
+requests-mock
+pytest-asyncio
