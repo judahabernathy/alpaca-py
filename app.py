@@ -229,6 +229,73 @@ async def _request_with_retry(
     return response
 
 
+async def _get_order_by_client_id(
+    session: aiohttp.ClientSession, client_order_id: str
+) -> Optional[dict]:
+    """Fetch an order by client_order_id via the Alpaca REST endpoint."""
+    if not client_order_id:
+        return None
+    url = f"{ALPACA_API_BASE_URL}/v2/orders:by_client_order_id"
+    try:
+        response = await _request_with_retry(
+            session, "GET", url, params={"client_order_id": client_order_id}
+        )
+    except HTTPException:
+        return None
+    try:
+        body = await response.text()
+        if response.status >= 400:
+            return None
+        return json.loads(body) if body else None
+    finally:
+        await response.release()
+
+
+async def _post_order_idempotent(
+    session: aiohttp.ClientSession, payload: dict
+) -> dict | None:
+    """Create an order with idempotent recovery on failures."""
+    url = f"{ALPACA_API_BASE_URL}/v2/orders"
+    client_order_id = payload.get("client_order_id")
+
+    # First attempt: optimistic POST to detect network errors separately.
+    try:
+        response = await session.post(url, json=payload)
+    except Exception:
+        if client_order_id:
+            existing = await _get_order_by_client_id(session, client_order_id)
+            if existing is not None:
+                return existing
+        response = await _request_with_retry(session, "POST", url, json=payload)
+
+    try:
+        body = await response.text()
+
+        if 500 <= response.status < 600 and os.getenv("ALPHA_IDEMPOTENT_RETRY") == "1":
+            if client_order_id:
+                existing = await _get_order_by_client_id(session, client_order_id)
+                if existing is not None:
+                    return existing
+            retry_response = await _request_with_retry(
+                session, "POST", url, json=payload
+            )
+            try:
+                retry_body = await retry_response.text()
+                if retry_response.status >= 400:
+                    raise HTTPException(
+                        status_code=retry_response.status, detail=retry_body
+                    )
+                return json.loads(retry_body) if retry_body else None
+            finally:
+                await retry_response.release()
+
+        if response.status >= 400:
+            raise HTTPException(status_code=response.status, detail=body)
+        return json.loads(body) if body else None
+    finally:
+        await response.release()
+
+
 app.include_router(advanced_orders_router)
 
 
@@ -369,16 +436,7 @@ async def order_create(
         payload["client_order_id"] = str(uuid.uuid4())
     _enforce_ext_policy(payload)
     async with aiohttp.ClientSession(headers=_alpaca_headers()) as session:
-        r = await _request_with_retry(
-            session, "POST", f"{ALPACA_API_BASE_URL}/v2/orders", json=payload
-        )
-        try:
-            body = await r.text()
-            if r.status >= 400:
-                raise HTTPException(status_code=r.status, detail=body)
-            return json.loads(body) if body else None
-        finally:
-            await r.release()
+        return await _post_order_idempotent(session, payload)
 
 
 @app.get("/v2/account")
