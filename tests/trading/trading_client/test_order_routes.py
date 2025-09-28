@@ -326,6 +326,8 @@ def test_cancel_order_by_id(reqmock, trading_client: TradingClient):
     trading_client.cancel_order_by_id(order_id)
 
     assert reqmock.called_once
+    request = reqmock.request_history[0]
+    assert request.body is None
 
 
 def test_cancel_order_throws_uncancelable_error(reqmock, trading_client: TradingClient):
