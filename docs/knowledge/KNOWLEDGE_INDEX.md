@@ -6,6 +6,7 @@ Scope: supporting docs for the 6 actions. Source of truth = Actions OpenAPI + Ro
 - policies/: routing, risk, session, idempotency, errors
 - workflows/: fast_lane, watchlist, memory
 - specs/: endpoint summaries (not full OpenAPI)
+- strategies/: TI strategy cards (source of truth)
 - tests/: golden prompts + pass criteria
 - scripts/: PowerShell 7 smokes
 - snippets/: reusable response text
@@ -30,5 +31,6 @@ Scope: supporting docs for the 6 actions. Source of truth = Actions OpenAPI + Ro
 - specs/journals_summary.md
 - specs/classifier_summary.md
 - specs/finnhub_summary.md
+- strategies/ti_strategy_cards.md
 - tests/golden_prompts.md
 - scripts/ps7_smoke.ps1
