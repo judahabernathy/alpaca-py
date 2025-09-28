@@ -2,6 +2,13 @@
 
 Use Paper. Expect specific Router echoes or FastLaneResult bundles.
 
+## Tone checks (applies to all cases)
+- Answer-first line present.
+- `Next moves:` present with 1–3 items.
+- `Pro move:` one actionable line present.
+- When blocked: `What to watch:` present with one concrete step.
+- No fluff; concise.
+
 1) Fast lane RTH limit: AAPL buy; fresh TTL; expect submitted_order!=null; journal created.
 2) EXT bracket reject: user requests bracket in EXT; expect validation.ok=false; reason includes EXT rule; next moves suggest RTH bracket.
 3) Quote TTL stale: expect prompt to refresh Preflight; no order.
