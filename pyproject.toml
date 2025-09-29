@@ -32,6 +32,7 @@ ruff = { version = "^0.6.4", optional = true }
 mypy = { version = "^1.10.0", optional = true }
 types-aiofiles = { version = "^23.2.0.0", optional = true }
 types-requests = { version = "^2.32.0.0", optional = true }
+pytest-cov = { version = "^5.0.0", optional = true }
 
 
 
@@ -62,10 +63,26 @@ dev = [
 requires = ["poetry-core>=1.4.2", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
 build-backend = "poetry_dynamic_versioning.backend"
 
+
+[tool.pytest.ini_options]
+addopts = "--cov=edge --cov=app --cov=alpaca --cov-fail-under=85 -q"
+
+[tool.coverage.run]
+source = ["app", "edge", "alpaca_client"]
+omit = [
+    "alpaca/broker/*",
+    "alpaca/common/*",
+    "alpaca/data/*",
+    "alpaca/trading/*",
+    "docs/*",
+    "examples/*",
+]
+
+
+
 [tool.ruff]
 line-length = 100
 target-version = "py38"
-
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]
 ignore = ["E203", "E501"]
