@@ -19,21 +19,21 @@ def reload_config_with_env(env: Dict[str, str]) -> Any:
         os.environ.update(original)
 
     os.environ["APCA_API_BASE_URL"] = cfg.APCA_API_BASE_URL
-    os.environ["ALPACA_API_BASE_URL"] = cfg.APCA_API_BASE_URL
     return cfg
 
 
 def test_base_url_defaults_to_paper():
     cfg = reload_config_with_env({})
     assert cfg.APCA_API_BASE_URL.startswith("https://paper-api.alpaca.markets")
-    assert os.environ["APCA_API_BASE_URL"] == os.environ["ALPACA_API_BASE_URL"]
+    assert os.environ["APCA_API_BASE_URL"] == cfg.APCA_API_BASE_URL
+    assert "ALPACA_API_BASE_URL" not in os.environ
 
 
 def test_alias_env_unifies_bases():
     cfg = reload_config_with_env({"ALPACA_API_BASE_URL": "https://api.alpaca.markets"})
     assert cfg.APCA_API_BASE_URL.endswith("api.alpaca.markets")
     assert os.environ["APCA_API_BASE_URL"] == "https://api.alpaca.markets"
-    assert os.environ["ALPACA_API_BASE_URL"] == "https://api.alpaca.markets"
+    assert "ALPACA_API_BASE_URL" not in os.environ
 
 
 def test_ext_requires_limit_day_and_forbids_bracket(monkeypatch):
@@ -163,3 +163,19 @@ def test_require_client_id_when_flag_set():
         app._resolve_client_order_id(None)
     assert excinfo.value.status_code == 400
     os.environ.pop("ALPHA_REQUIRE_CLIENT_ID", None)
+
+
+
+def test_client_id_passthrough_without_requirement():
+    import app
+
+    os.environ.pop("ALPHA_REQUIRE_CLIENT_ID", None)
+    assert app._resolve_client_order_id("custom-123") == "custom-123"
+
+
+
+def test_client_id_passthrough_with_requirement(monkeypatch):
+    import app
+
+    monkeypatch.setenv("ALPHA_REQUIRE_CLIENT_ID", "1")
+    assert app._resolve_client_order_id("user-provided") == "user-provided"
