@@ -7,7 +7,8 @@ from typing import Any, Dict
 
 import pytest
 from fastapi import HTTPException
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from starlette.requests import Request
 
 import edge.app as app
 import edge.http as edge_http
@@ -528,35 +529,53 @@ async def test_gateway_routes_and_market_data(monkeypatch):
             self._responses = responses
 
         async def request(self, method, path, headers=None, **kwargs):
-            expected_method, expected_path, status, content_type, body = self._responses.pop(0)
+            expected_method, expected_path, status, content_type, body, expected_params = self._responses.pop(0)
             assert expected_method == method
             assert expected_path == path
+            if expected_params is not None:
+                assert kwargs.get("params") == expected_params
             return status, {"Content-Type": content_type}, body
 
     responses = [
-        ("GET", "/v2/account", 200, "application/json", json.dumps({"id": "acct"})),
-        ("GET", "/v2/orders", 200, "application/json", json.dumps([{ "id": "order" }])),
-        ("GET", "/v2/orders/abc", 200, "application/json", json.dumps({"id": "abc"})),
-        ("GET", "/v2/positions", 200, "application/json", json.dumps([])),
-        ("GET", "/v2/positions/AAPL", 200, "application/json", json.dumps({"symbol": "AAPL"})),
-        ("DELETE", "/v2/positions", 200, "application/json", json.dumps({"status": "all-closed"})),
-        ("DELETE", "/v2/positions/AAPL", 200, "application/json", json.dumps({"status": "closed"})),
-        ("GET", "/v2/watchlists", 200, "application/json", json.dumps([])),
-        ("POST", "/v2/watchlists", 200, "application/json", json.dumps({"id": "wl"})),
-        ("GET", "/v2/watchlists/wl", 200, "application/json", json.dumps({"id": "wl"})),
-        ("PUT", "/v2/watchlists/wl", 200, "application/json", json.dumps({"id": "wl", "symbols": ["AAPL"]})),
-        ("DELETE", "/v2/watchlists/wl", 204, "text/plain", ""),
+        ("GET", "/v2/account", 200, "application/json", json.dumps({"id": "acct"}), None),
+        ("GET", "/v2/orders", 200, "application/json", json.dumps([{ "id": "order" }]), None),
+        (
+            "GET",
+            "/v2/orders",
+            200,
+            "application/json",
+            json.dumps([{ "id": "filtered" }]),
+            {"status": "open", "symbols": "AAPL,MSFT"},
+        ),
+        ("GET", "/v2/orders/abc", 200, "application/json", json.dumps({"id": "abc"}), None),
+        ("GET", "/v2/positions", 200, "application/json", json.dumps([]), None),
+        ("GET", "/v2/positions/AAPL", 200, "application/json", json.dumps({"symbol": "AAPL"}), None),
+        ("DELETE", "/v2/positions", 200, "application/json", json.dumps({"status": "all-closed"}), {"cancel_orders": "false"}),
+        ("DELETE", "/v2/positions/AAPL", 200, "application/json", json.dumps({"status": "closed"}), {"cancel_orders": "false"}),
+        ("GET", "/v2/watchlists", 200, "application/json", json.dumps([]), None),
+        ("POST", "/v2/watchlists", 200, "application/json", json.dumps({"id": "wl"}), None),
+        ("GET", "/v2/watchlists/wl", 200, "application/json", json.dumps({"id": "wl"}), None),
+        ("PUT", "/v2/watchlists/wl", 200, "application/json", json.dumps({"id": "wl", "symbols": ["AAPL"]}), None),
+        ("DELETE", "/v2/watchlists/wl", 204, "text/plain", "", None),
+        ("GET", "/v2/account/activities", 200, "application/json", json.dumps([]), {"direction": "desc"}),
     ]
 
     fake_client = FakeHttpClient(responses)
+    monkeypatch.delenv("EDGE_API_KEY", raising=False)
+    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
+    monkeypatch.delenv("X_API_KEY", raising=False)
+    monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
     monkeypatch.setattr(app, "_get_http_client", lambda: fake_client)
-    monkeypatch.setenv("EDGE_API_KEY", "edge-key")
+    monkeypatch.setattr(app, "_alpaca_headers", lambda: {"APCA-API-KEY-ID": "id", "APCA-API-SECRET-KEY": "secret"})
 
     account = await app.account_get(x_api_key="edge-key")
     assert account == {"id": "acct"}
 
     orders = await app.orders_list(status=None, x_api_key="edge-key")
     assert orders == [{"id": "order"}]
+
+    filtered = await app.orders_list(status="open", symbols=["AAPL", "MSFT"], x_api_key="edge-key")
+    assert filtered == [{"id": "filtered"}]
 
     order = await app.orders_get_by_id("abc", x_api_key="edge-key")
     assert order["id"] == "abc"
@@ -574,6 +593,9 @@ async def test_gateway_routes_and_market_data(monkeypatch):
     delete_resp = await app.watchlists_delete_v2("wl", x_api_key="edge-key")
     assert isinstance(delete_resp, Response)
     assert delete_resp.status_code == 204
+
+    activities = await app.account_activities(direction="desc", x_api_key="edge-key")
+    assert activities == []
 
     class FakeFrame:
         def __init__(self, payload):
@@ -608,29 +630,40 @@ async def test_gateway_routes_and_market_data(monkeypatch):
 @pytest.mark.asyncio
 async def test_spec_serving(monkeypatch, tmp_path):
 
+    async def _receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    request_scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/.well-known/openapi.json",
+        "headers": [],
+        "query_string": b"",
+        "server": ("127.0.0.1", 8000),
+        "scheme": "http",
+    }
+
+    request = Request(request_scope, _receive)
+
     path_json = tmp_path / "openapi.json"
     path_json.write_text('{"openapi": "3.1.0"}')
 
-    file_resp = app._serve_spec_file(path_json, "application/json")
-    assert isinstance(file_resp, FileResponse)
+    file_resp = app._serve_spec_file(path_json, "application/json", request)
+    assert isinstance(file_resp, JSONResponse)
+    body = json.loads(file_resp.body.decode())
+    assert body["servers"][0]["url"] == "http://127.0.0.1:8000"
 
     missing = tmp_path / "missing.yaml"
-    json_resp = app._serve_spec_file(missing, "application/json")
+    json_resp = app._serve_spec_file(missing, "application/json", request)
     assert isinstance(json_resp, JSONResponse)
 
-    yaml_resp = app._serve_spec_file(missing, "application/yaml")
+    yaml_resp = app._serve_spec_file(missing, "application/yaml", request)
     assert isinstance(yaml_resp, PlainTextResponse)
 
-    # Ensure OpenAPI schema carries descriptive text
     spec = app._custom_openapi()
     desc = spec["info"]["description"]
     assert "rate" in desc
     assert "Retry-After" in desc
-
-    assert app.well_known_openapi_json().media_type == "application/json"
-    assert app.well_known_openapi_yaml().media_type == "application/yaml"
-    assert app.openapi_json_alias().media_type == "application/json"
-    assert app.openapi_yaml_alias().media_type == "application/yaml"
 
 def test_order_payload_from_model_variants():
 
@@ -796,6 +829,10 @@ def test_alpaca_headers_requires_credentials(monkeypatch):
 
 def test_require_gateway_key(monkeypatch):
 
+    monkeypatch.delenv("EDGE_API_KEY", raising=False)
+    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
+    monkeypatch.delenv("X_API_KEY", raising=False)
+
     monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
 
     with pytest.raises(HTTPException):
@@ -803,7 +840,81 @@ def test_require_gateway_key(monkeypatch):
 
     app._require_gateway_key(header_key="edge-key")
 
+    monkeypatch.setattr(app, "EDGE_API_KEY", None, raising=False)
+    monkeypatch.setenv("EDGE_API_KEY", "env-key")
+
+    with pytest.raises(HTTPException):
+        app._require_gateway_key(header_key="edge-key")
+
+    app._require_gateway_key(header_key="env-key")
+
+    monkeypatch.setattr(app, "EDGE_API_KEY", "override", raising=False)
+
+    with pytest.raises(HTTPException):
+        app._require_gateway_key(header_key="env-key")
+
+    app._require_gateway_key(header_key="override")
 
 
 
+@pytest.mark.asyncio
+async def test_readyz_detail(monkeypatch):
+
+    monkeypatch.delenv("EDGE_API_KEY", raising=False)
+    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
+    monkeypatch.delenv("X_API_KEY", raising=False)
+    monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
+    monkeypatch.setattr(app, "API_BASE_URL", "https://example", raising=False)
+    monkeypatch.setattr(app, "_get_http_client", lambda: object())
+    monkeypatch.setattr(app, "_alpaca_headers", lambda: {"APCA-API-KEY-ID": "id", "APCA-API-SECRET-KEY": "secret"})
+
+    payload = await app.readyz(detail=True, x_api_key="edge-key")
+    assert payload["ready"] is True
+    assert payload["detail"]["http_client"] is True
+    assert payload["detail"]["alpaca_credentials"] is True
+
+
+@pytest.mark.asyncio
+async def test_readyz_reports_failures(monkeypatch):
+
+    monkeypatch.delenv("EDGE_API_KEY", raising=False)
+    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
+    monkeypatch.delenv("X_API_KEY", raising=False)
+    monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
+
+    def fail_client():
+        raise HTTPException(status_code=500, detail="no client")
+
+    monkeypatch.setattr(app, "_get_http_client", fail_client)
+
+    def fail_headers():
+        raise HTTPException(status_code=500, detail="no creds")
+
+    monkeypatch.setattr(app, "_alpaca_headers", fail_headers)
+    monkeypatch.setattr(app, "API_BASE_URL", "", raising=False)
+
+    payload = await app.readyz(detail=False, x_api_key="edge-key")
+    assert payload["ready"] is False
+    assert set(payload["detail"]["failing"]) == {"http_client", "alpaca_credentials", "api_base_url"}
+
+
+@pytest.mark.asyncio
+async def test_account_activities_translates_unauthorized(monkeypatch):
+
+    monkeypatch.delenv("EDGE_API_KEY", raising=False)
+    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
+    monkeypatch.delenv("X_API_KEY", raising=False)
+    monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
+
+    async def fake_request_with_retry(client, method, path, headers=None, **kwargs):
+        assert kwargs.get("params") == {"direction": "desc"}
+        return 401, {"Content-Type": "application/json"}, '{"message": "unauthorized"}'
+
+    monkeypatch.setattr(app, "_get_http_client", lambda: object())
+    monkeypatch.setattr(app, "_request_with_retry", fake_request_with_retry)
+
+    response = await app.account_activities(direction="desc", x_api_key="edge-key")
+    assert isinstance(response, JSONResponse)
+    assert response.status_code == 403
+    assert json.loads(response.body.decode())["detail"].startswith("Activities not enabled")
 

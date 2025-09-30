@@ -1,267 +1,922 @@
 openapi: 3.1.0
 info:
-  title: Alpaca Trading API (Live)
-  version: 1.1.1
-servers:
-  # Use your Railway wrapper; keep a single server to avoid multi-server import warnings.
-  - url: https://alpaca-py-production.up.railway.app
+  title: Alpaca Wrapper
+  version: 1.0.0
+  description: 'All endpoints require the `X-API-Key` header; the `api_key` query
+    parameter is
 
-# Apply auth to all operations (one scheme only)
-security:
-  - ApiKeyAuth: []
+    supported as a compatibility fallback. The service propagates Alpaca''s rate
+
+    limits as HTTP 429 responses and surfaces the upstream `Retry-After` header.
+
+    When `extended_hours` is enabled the order payload must remain a DAY limit
+
+    order, include `limit_price`, and omit advanced `order_class` values.'
 paths:
+  /healthz:
+    get:
+      summary: Healthz
+      operationId: healthz_healthz_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /readyz:
+    get:
+      summary: Readyz
+      description: Readiness probe that verifies upstream dependencies.
+      operationId: readyz_readyz_get
+      parameters:
+      - name: detail
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Detail
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/orders/sync:
+    post:
+      summary: Order Create Sync
+      description: 'Synchronously mirror `/v2/orders` in the current thread.
+
+
+        Applies the limit guard (extended-hours must be DAY limit orders)
+
+        and surfaces upstream HTTP 429 responses with their `Retry-After`.'
+      operationId: order_create_sync_v2_orders_sync_post
+      parameters:
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrder'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v2/orders:
     post:
-      summary: Submit a new order
-      operationId: ordersCreate
-      # auth via top-level security
+      summary: Order Create
+      description: "Submit an order via Alpaca's `/v2/orders`. \n\nRequires `X-API-Key`,\
+        \ forwards 429 responses with `Retry-After`, and\napplies the limit guard\
+        \ (extended-hours must be DAY limit orders)."
+      operationId: order_create_v2_orders_post
+      parameters:
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/OrderIn"
+              $ref: '#/components/schemas/CreateOrder'
       responses:
-        "200":
-          description: Order created
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     get:
-      summary: List orders
-      operationId: ordersList
-      # auth via top-level security
+      summary: Orders List
+      operationId: orders_list_v2_orders_get
       parameters:
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            default: open
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - type: array
+                items:
+                  type: string
+              - type: 'null'
+              title: Symbols
       responses:
-        "200":
-          description: Orders list
-  /v2/orders/{order_id}:
-    get:
-      summary: Get order by ID
-      operationId: ordersGetById
-      # auth via top-level security
-      parameters:
-        - name: order_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Order detail
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     delete:
-      summary: Cancel order
-      operationId: ordersCancelById
-      # auth via top-level security
+      summary: Orders Cancel All
+      description: Cancel all open orders.
+      operationId: orders_cancel_all_v2_orders_delete
       parameters:
-        - name: order_id
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       responses:
-        "204":
-          description: Order cancelled
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v2/account:
     get:
-      summary: Get account details
-      operationId: accountGet
-      # auth via top-level security
+      summary: Account Get
+      operationId: account_get_v2_account_get
+      parameters:
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       responses:
-        "200":
-          description: Account info
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/account/activities:
+    get:
+      summary: Account Activities
+      operationId: account_activities_v2_account_activities_get
+      parameters:
+      - name: activity_type
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Activity Type
+      - name: date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Date
+      - name: until
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Until
+      - name: after
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: After
+      - name: direction
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Direction
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Page Size
+      - name: page_token
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Page Token
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/orders/{order_id}:
+    get:
+      summary: Orders Get By Id
+      operationId: orders_get_by_id_v2_orders__order_id__get
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Order Id
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      summary: Orders Cancel By Id
+      description: Cancel a specific order by id.
+      operationId: orders_cancel_by_id_v2_orders__order_id__delete
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Order Id
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v2/positions:
     get:
-      summary: List open positions
-      operationId: positionsList
-      # auth via top-level security
-      responses:
-        "200":
-          description: Positions list
-    delete:
-      summary: Close all positions
-      operationId: positionsCloseAll
-      # auth via top-level security
+      summary: Positions List V2
+      operationId: positions_list_v2_v2_positions_get
       parameters:
-        - name: cancel_orders
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       responses:
-        "200":
-          description: Positions closed
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      summary: Positions Close All
+      operationId: positions_close_all_v2_positions_delete
+      parameters:
+      - name: cancel_orders
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Cancel Orders
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v2/positions/{symbol}:
     get:
-      summary: Get position
-      operationId: positionsGet
-      # auth via top-level security
+      summary: Positions Get
+      operationId: positions_get_v2_positions__symbol__get
       parameters:
-        - name: symbol
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: symbol
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Symbol
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       responses:
-        "200":
-          description: Position detail
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     delete:
-      summary: Close position
-      operationId: positionsClose
-      # auth via top-level security
+      summary: Positions Close
+      operationId: positions_close_v2_positions__symbol__delete
       parameters:
-        - name: symbol
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: cancel_orders
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
+      - name: symbol
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Symbol
+      - name: cancel_orders
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Cancel Orders
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       responses:
-        "200":
-          description: Position closed
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v2/watchlists:
     get:
-      summary: List watchlists
-      tags: [watchlists]
-      operationId: watchlistsList
-      # auth via top-level security
+      summary: Watchlists List V2
+      operationId: watchlists_list_v2_v2_watchlists_get
+      parameters:
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       responses:
-        "200":
-          description: Watchlists list
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     post:
-      summary: Create watchlist
-      tags: [watchlists]
-      operationId: watchlistsCreate
-      # auth via top-level security
+      summary: Watchlists Create V2
+      operationId: watchlists_create_v2_v2_watchlists_post
+      parameters:
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/WatchlistIn"
+              $ref: '#/components/schemas/WatchlistIn'
       responses:
-        "200":
-          description: Watchlist created
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v2/watchlists/{watchlist_id}:
     get:
-      summary: Get watchlist
-      tags: [watchlists]
-      operationId: watchlistsGet
-      # auth via top-level security
+      summary: Watchlists Get V2
+      operationId: watchlists_get_v2_v2_watchlists__watchlist_id__get
       parameters:
-        - name: watchlist_id
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: watchlist_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Watchlist Id
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       responses:
-        "200":
-          description: Watchlist detail
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     put:
-      summary: Update watchlist
-      tags: [watchlists]
-      operationId: watchlistsUpdate
-      # auth via top-level security
+      summary: Watchlists Update V2
+      operationId: watchlists_update_v2_v2_watchlists__watchlist_id__put
       parameters:
-        - name: watchlist_id
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: watchlist_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Watchlist Id
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/WatchlistIn"
+              $ref: '#/components/schemas/WatchlistIn'
       responses:
-        "200":
-          description: Watchlist updated
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     delete:
-      summary: Delete watchlist
-      tags: [watchlists]
-      operationId: watchlistsDelete
-      # auth via top-level security
+      summary: Watchlists Delete V2
+      operationId: watchlists_delete_v2_v2_watchlists__watchlist_id__delete
       parameters:
-        - name: watchlist_id
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: watchlist_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Watchlist Id
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
       responses:
-        "200":
-          description: Watchlist deleted
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/quotes:
+    get:
+      summary: Get Quotes V2
+      operationId: get_quotes_v2_v2_quotes_get
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Symbol
+      - name: start
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Start
+      - name: end
+        in: query
+        required: true
+        schema:
+          type: string
+          title: End
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                title: Response Get Quotes V2 V2 Quotes Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/trades:
+    get:
+      summary: Get Trades V2
+      operationId: get_trades_v2_v2_trades_get
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Symbol
+      - name: start
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Start
+      - name: end
+        in: query
+        required: true
+        schema:
+          type: string
+          title: End
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                title: Response Get Trades V2 V2 Trades Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/bars:
+    get:
+      summary: Get Bars V2
+      operationId: get_bars_v2_v2_bars_get
+      parameters:
+      - name: symbol
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Symbol
+      - name: timeframe
+        in: query
+        required: false
+        schema:
+          type: string
+          default: 1Day
+          title: Timeframe
+      - name: start
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Start
+      - name: end
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: End
+      - name: X-API-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                title: Response Get Bars V2 V2 Bars Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
-  securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: header
-      name: x-api-key
   schemas:
-    OrderIn:
-      type: object
-      required: [symbol, side, type, time_in_force]
+    CreateOrder:
       properties:
         symbol:
           type: string
+          title: Symbol
         side:
           type: string
-          enum: [buy, sell]
+          title: Side
+        qty:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Qty
+        notional:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Notional
         type:
           type: string
-          enum: [market, limit, stop, stop_limit, trailing_stop]
+          title: Type
         time_in_force:
           type: string
-          enum: [day, gtc, opg, cls, ioc, fok]
-        qty:         { type: number }
-        notional:    { type: number }
-        limit_price: { type: number }
-        stop_price:  { type: number }
-        client_order_id:
-          type: string
-        extended_hours:
-          type: boolean
-          default: false
+          title: Time In Force
+        limit_price:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Limit Price
+        stop_price:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Stop Price
         order_class:
-          type: string
-          enum: [simple, bracket, oco, oto]
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Order Class
         take_profit:
-          type: object
-          properties:
-            limit_price: { type: number }
-          required: [limit_price]
-          additionalProperties: false
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Take Profit
         stop_loss:
-          type: object
-          properties:
-            stop_price:  { type: number }
-            limit_price: { type: number }
-          required: [stop_price]
-          additionalProperties: false
-        trail_price:   { type: number }
-        trail_percent: { type: number }
-      additionalProperties: false
-      oneOf:
-        - required: [qty]
-        - required: [notional]
-    WatchlistIn:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Stop Loss
+        extended_hours:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Extended Hours
+        trail_price:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Trail Price
+        trail_percent:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Trail Percent
+        client_order_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Order Id
       type: object
       required:
-        - name
-        - symbols
+      - symbol
+      - side
+      - type
+      - time_in_force
+      title: CreateOrder
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    WatchlistIn:
       properties:
         name:
           type: string
+          title: Name
         symbols:
-          type: array
           items:
             type: string
+          type: array
+          title: Symbols
+      type: object
+      required:
+      - name
+      - symbols
+      title: WatchlistIn
+  securitySchemes:
+    EdgeApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+servers:
+- url: http://localhost:8000
+security:
+- EdgeApiKey: []

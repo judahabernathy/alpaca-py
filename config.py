@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import os
+from dotenv import load_dotenv
 from typing import Final
 
 DEFAULT_BASE_URL: Final[str] = "https://paper-api.alpaca.markets"
+
+
+load_dotenv(override=True)
 
 
 def _normalise_base_url(value: str | None) -> str:

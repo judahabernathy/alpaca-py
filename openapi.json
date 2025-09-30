@@ -2,126 +2,10 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Alpaca Wrapper",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "description": "All endpoints require the `X-API-Key` header; the `api_key` query parameter is\nsupported as a compatibility fallback. The service propagates Alpaca's rate\nlimits as HTTP 429 responses and surfaces the upstream `Retry-After` header.\nWhen `extended_hours` is enabled the order payload must remain a DAY limit\norder, include `limit_price`, and omit advanced `order_class` values."
   },
   "paths": {
-    "/v1/order/bracket": {
-      "post": {
-        "tags": [
-          "Orders"
-        ],
-        "summary": "Place Bracket",
-        "operationId": "place_bracket_v1_order_bracket_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BracketOrderBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/order/stop": {
-      "post": {
-        "tags": [
-          "Orders"
-        ],
-        "summary": "Place Stop",
-        "operationId": "place_stop_v1_order_stop_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StopOrderBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/order/trailing": {
-      "post": {
-        "tags": [
-          "Orders"
-        ],
-        "summary": "Place Trailing",
-        "operationId": "place_trailing_v1_order_trailing_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TrailingOrderBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/healthz": {
       "get": {
         "summary": "Healthz",
@@ -138,13 +22,69 @@
         }
       }
     },
-    "/v1/order": {
-      "post": {
-        "summary": "Submit Order",
-        "operationId": "submit_order_v1_order_post",
+    "/readyz": {
+      "get": {
+        "summary": "Readyz",
+        "description": "Readiness probe that verifies upstream dependencies.",
+        "operationId": "readyz_readyz_get",
         "parameters": [
           {
-            "name": "x-api-key",
+            "name": "detail",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Detail"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/orders/sync": {
+      "post": {
+        "summary": "Order Create Sync",
+        "description": "Synchronously mirror `/v2/orders` in the current thread.\n\nApplies the limit guard (extended-hours must be DAY limit orders)\nand surfaces upstream HTTP 429 responses with their `Retry-After`.",
+        "operationId": "order_create_sync_v2_orders_sync_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -165,7 +105,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OrderIn"
+                "$ref": "#/components/schemas/CreateOrder"
               }
             }
           }
@@ -192,23 +132,145 @@
         }
       }
     },
-    "/v1/orders": {
+    "/v2/orders": {
+      "post": {
+        "summary": "Order Create",
+        "description": "Submit an order via Alpaca's `/v2/orders`. \n\nRequires `X-API-Key`, forwards 429 responses with `Retry-After`, and\napplies the limit guard (extended-hours must be DAY limit orders).",
+        "operationId": "order_create_v2_orders_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
-        "summary": "List Orders",
-        "operationId": "list_orders_v1_orders_get",
+        "summary": "Orders List",
+        "operationId": "orders_list_v2_orders_get",
         "parameters": [
           {
             "name": "status",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "default": "open",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Status"
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Symbols"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Orders Cancel All",
+        "description": "Cancel all open orders.",
+        "operationId": "orders_cancel_all_v2_orders_delete",
+        "parameters": [
+          {
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -246,10 +308,210 @@
         }
       }
     },
-    "/v1/orders/{order_id}": {
+    "/v2/account": {
       "get": {
-        "summary": "Get Order",
-        "operationId": "get_order_v1_orders__order_id__get",
+        "summary": "Account Get",
+        "operationId": "account_get_v2_account_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/account/activities": {
+      "get": {
+        "summary": "Account Activities",
+        "operationId": "account_activities_v2_account_activities_get",
+        "parameters": [
+          {
+            "name": "activity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Activity Type"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "page_token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Token"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/orders/{order_id}": {
+      "get": {
+        "summary": "Orders Get By Id",
+        "operationId": "orders_get_by_id_v2_orders__order_id__get",
         "parameters": [
           {
             "name": "order_id",
@@ -261,7 +523,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -299,8 +561,9 @@
         }
       },
       "delete": {
-        "summary": "Cancel Order",
-        "operationId": "cancel_order_v1_orders__order_id__delete",
+        "summary": "Orders Cancel By Id",
+        "description": "Cancel a specific order by id.",
+        "operationId": "orders_cancel_by_id_v2_orders__order_id__delete",
         "parameters": [
           {
             "name": "order_id",
@@ -312,7 +575,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -350,57 +613,13 @@
         }
       }
     },
-    "/v1/account": {
+    "/v2/positions": {
       "get": {
-        "summary": "Get Account",
-        "operationId": "get_account_v1_account_get",
+        "summary": "Positions List V2",
+        "operationId": "positions_list_v2_v2_positions_get",
         "parameters": [
           {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/positions": {
-      "get": {
-        "summary": "List Positions",
-        "operationId": "list_positions_v1_positions_get",
-        "parameters": [
-          {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -438,8 +657,8 @@
         }
       },
       "delete": {
-        "summary": "Close All Positions",
-        "operationId": "close_all_positions_v1_positions_delete",
+        "summary": "Positions Close All",
+        "operationId": "positions_close_all_v2_positions_delete",
         "parameters": [
           {
             "name": "cancel_orders",
@@ -452,7 +671,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -490,10 +709,10 @@
         }
       }
     },
-    "/v1/positions/{symbol}": {
+    "/v2/positions/{symbol}": {
       "get": {
-        "summary": "Get Position",
-        "operationId": "get_position_v1_positions__symbol__get",
+        "summary": "Positions Get",
+        "operationId": "positions_get_v2_positions__symbol__get",
         "parameters": [
           {
             "name": "symbol",
@@ -505,7 +724,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -543,8 +762,8 @@
         }
       },
       "delete": {
-        "summary": "Close Position",
-        "operationId": "close_position_v1_positions__symbol__delete",
+        "summary": "Positions Close",
+        "operationId": "positions_close_v2_positions__symbol__delete",
         "parameters": [
           {
             "name": "symbol",
@@ -566,7 +785,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -604,13 +823,13 @@
         }
       }
     },
-    "/v1/watchlists": {
+    "/v2/watchlists": {
       "get": {
-        "summary": "List Watchlists",
-        "operationId": "list_watchlists_v1_watchlists_get",
+        "summary": "Watchlists List V2",
+        "operationId": "watchlists_list_v2_v2_watchlists_get",
         "parameters": [
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -648,11 +867,11 @@
         }
       },
       "post": {
-        "summary": "Create Watchlist",
-        "operationId": "create_watchlist_v1_watchlists_post",
+        "summary": "Watchlists Create V2",
+        "operationId": "watchlists_create_v2_v2_watchlists_post",
         "parameters": [
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -700,10 +919,10 @@
         }
       }
     },
-    "/v1/watchlists/{watchlist_id}": {
+    "/v2/watchlists/{watchlist_id}": {
       "get": {
-        "summary": "Get Watchlist",
-        "operationId": "get_watchlist_v1_watchlists__watchlist_id__get",
+        "summary": "Watchlists Get V2",
+        "operationId": "watchlists_get_v2_v2_watchlists__watchlist_id__get",
         "parameters": [
           {
             "name": "watchlist_id",
@@ -715,7 +934,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -753,8 +972,8 @@
         }
       },
       "put": {
-        "summary": "Update Watchlist",
-        "operationId": "update_watchlist_v1_watchlists__watchlist_id__put",
+        "summary": "Watchlists Update V2",
+        "operationId": "watchlists_update_v2_v2_watchlists__watchlist_id__put",
         "parameters": [
           {
             "name": "watchlist_id",
@@ -766,7 +985,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -814,8 +1033,8 @@
         }
       },
       "delete": {
-        "summary": "Delete Watchlist",
-        "operationId": "delete_watchlist_v1_watchlists__watchlist_id__delete",
+        "summary": "Watchlists Delete V2",
+        "operationId": "watchlists_delete_v2_v2_watchlists__watchlist_id__delete",
         "parameters": [
           {
             "name": "watchlist_id",
@@ -827,7 +1046,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -865,10 +1084,10 @@
         }
       }
     },
-    "/v1/quotes": {
+    "/v2/quotes": {
       "get": {
-        "summary": "Get Quotes",
-        "operationId": "get_quotes_v1_quotes_get",
+        "summary": "Get Quotes V2",
+        "operationId": "get_quotes_v2_v2_quotes_get",
         "parameters": [
           {
             "name": "symbol",
@@ -898,7 +1117,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -919,7 +1138,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "title": "Response Get Quotes V2 V2 Quotes Get"
+                }
               }
             }
           },
@@ -936,10 +1161,10 @@
         }
       }
     },
-    "/v1/trades": {
+    "/v2/trades": {
       "get": {
-        "summary": "Get Trades",
-        "operationId": "get_trades_v1_trades_get",
+        "summary": "Get Trades V2",
+        "operationId": "get_trades_v2_v2_trades_get",
         "parameters": [
           {
             "name": "symbol",
@@ -969,7 +1194,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -990,7 +1215,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "title": "Response Get Trades V2 V2 Trades Get"
+                }
               }
             }
           },
@@ -1007,10 +1238,10 @@
         }
       }
     },
-    "/v1/bars": {
+    "/v2/bars": {
       "get": {
-        "summary": "Get Bars",
-        "operationId": "get_bars_v1_bars_get",
+        "summary": "Get Bars V2",
+        "operationId": "get_bars_v2_v2_bars_get",
         "parameters": [
           {
             "name": "symbol",
@@ -1057,7 +1288,7 @@
             }
           },
           {
-            "name": "x-api-key",
+            "name": "X-API-Key",
             "in": "header",
             "required": false,
             "schema": {
@@ -1076,184 +1307,17 @@
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "title": "Response Get Bars V2 V2 Bars Get"
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/v2/orders": {
-      "post": {
-        "summary": "Create Order",
-        "operationId": "order_create",
-        "security": [
-          {
-            "ApiKeyAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateOrder"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Order accepted",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "4XX": {
-            "description": "Client error"
-          },
-          "5XX": {
-            "description": "Server error"
-          }
-        },
-        "parameters": [
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ]
-      }
-    },
-    "/v2/account": {
-      "get": {
-        "summary": "Get Account",
-        "operationId": "account.get",
-        "security": [
-          {
-            "alpacaKey": []
-          },
-          {
-            "alpacaSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Account",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      }
-    },
-    "/v2/positions": {
-      "get": {
-        "summary": "List Positions",
-        "operationId": "positions.list",
-        "security": [
-          {
-            "alpacaKey": []
-          },
-          {
-            "alpacaSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Positions",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        }
-      }
-    },
-    "/openapi.yaml": {
-      "get": {
-        "summary": "Spec",
-        "operationId": "spec_openapi_yaml_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v2/orders/{order_id}": {
-      "delete": {
-        "summary": "Cancel order by ID",
-        "operationId": "cancelOrderById_v2",
-        "parameters": [
-          {
-            "name": "order_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Order Id"
-            }
-          },
-          {
-            "name": "x-api-key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Api-Key"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Order cancelled"
           },
           "422": {
             "description": "Validation Error",
@@ -1270,140 +1334,8 @@
     }
   },
   "components": {
-    "securitySchemes": {
-      "ApiKeyAuth": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "x-api-key"
-      },
-      "alpacaKey": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "APCA-API-KEY-ID"
-      },
-      "alpacaSecret": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "APCA-API-SECRET-KEY"
-      }
-    },
     "schemas": {
-      "BracketOrderBody": {
-        "properties": {
-          "symbol": {
-            "type": "string",
-            "title": "Symbol"
-          },
-          "side": {
-            "type": "string",
-            "title": "Side"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "market",
-              "limit"
-            ],
-            "title": "Type",
-            "default": "market"
-          },
-          "qty": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Qty"
-          },
-          "notional": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notional"
-          },
-          "limit_price": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limit Price"
-          },
-          "time_in_force": {
-            "type": "string",
-            "title": "Time In Force",
-            "default": "day"
-          },
-          "order_class": {
-            "type": "string",
-            "const": "bracket",
-            "title": "Order Class",
-            "default": "bracket"
-          },
-          "take_profit": {
-            "$ref": "#/components/schemas/TakeProfit"
-          },
-          "stop_loss": {
-            "$ref": "#/components/schemas/StopLoss"
-          },
-          "extended_hours": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Extended Hours",
-            "default": false
-          },
-          "client_order_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Client Order Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "symbol",
-          "side",
-          "take_profit",
-          "stop_loss"
-        ],
-        "title": "BracketOrderBody"
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
-      },
-      "OrderIn": {
+      "CreateOrder": {
         "properties": {
           "symbol": {
             "type": "string",
@@ -1453,81 +1385,50 @@
               }
             ],
             "title": "Limit Price"
-          }
-        },
-        "type": "object",
-        "required": [
-          "symbol",
-          "side",
-          "type",
-          "time_in_force"
-        ],
-        "title": "OrderIn"
-      },
-      "StopLoss": {
-        "properties": {
-          "stop_price": {
-            "type": "number",
-            "title": "Stop Price"
-          },
-          "limit_price": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limit Price"
-          }
-        },
-        "type": "object",
-        "required": [
-          "stop_price"
-        ],
-        "title": "StopLoss"
-      },
-      "StopOrderBody": {
-        "properties": {
-          "symbol": {
-            "type": "string",
-            "title": "Symbol"
-          },
-          "side": {
-            "type": "string",
-            "title": "Side"
-          },
-          "qty": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Qty"
-          },
-          "notional": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notional"
-          },
-          "time_in_force": {
-            "type": "string",
-            "title": "Time In Force",
-            "default": "day"
           },
           "stop_price": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Stop Price"
+          },
+          "order_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Class"
+          },
+          "take_profit": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Take Profit"
+          },
+          "stop_loss": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Loss"
           },
           "extended_hours": {
             "anyOf": [
@@ -1538,78 +1439,7 @@
                 "type": "null"
               }
             ],
-            "title": "Extended Hours",
-            "default": false
-          },
-          "client_order_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Client Order Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "symbol",
-          "side",
-          "stop_price"
-        ],
-        "title": "StopOrderBody"
-      },
-      "TakeProfit": {
-        "properties": {
-          "limit_price": {
-            "type": "number",
-            "title": "Limit Price"
-          }
-        },
-        "type": "object",
-        "required": [
-          "limit_price"
-        ],
-        "title": "TakeProfit"
-      },
-      "TrailingOrderBody": {
-        "properties": {
-          "symbol": {
-            "type": "string",
-            "title": "Symbol"
-          },
-          "side": {
-            "type": "string",
-            "title": "Side"
-          },
-          "qty": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Qty"
-          },
-          "notional": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notional"
-          },
-          "time_in_force": {
-            "type": "string",
-            "title": "Time In Force",
-            "default": "day"
+            "title": "Extended Hours"
           },
           "trail_price": {
             "anyOf": [
@@ -1633,18 +1463,6 @@
             ],
             "title": "Trail Percent"
           },
-          "extended_hours": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Extended Hours",
-            "default": false
-          },
           "client_order_id": {
             "anyOf": [
               {
@@ -1660,159 +1478,24 @@
         "type": "object",
         "required": [
           "symbol",
-          "side"
-        ],
-        "title": "TrailingOrderBody"
-      },
-      "CreateOrder": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "symbol",
           "side",
-          "qty",
           "type",
           "time_in_force"
         ],
+        "title": "CreateOrder"
+      },
+      "HTTPValidationError": {
         "properties": {
-          "symbol": {
-            "type": "string"
-          },
-          "side": {
-            "type": "string",
-            "enum": [
-              "buy",
-              "sell"
-            ]
-          },
-          "qty": {
-            "type": "number",
-            "minimum": 1
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "market",
-              "limit",
-              "stop",
-              "stop_limit",
-              "trailing_stop"
-            ]
-          },
-          "time_in_force": {
-            "type": "string",
-            "enum": [
-              "day",
-              "gtc"
-            ]
-          },
-          "limit_price": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "stop_price": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "trail_price": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "trail_percent": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "order_class": {
-            "type": "string",
-            "enum": [
-              "simple",
-              "bracket",
-              "oco",
-              "oto"
-            ],
-            "default": "simple"
-          },
-          "take_profit": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "limit_price": {
-                "type": "number"
-              }
-            }
-          },
-          "stop_loss": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "stop_price": {
-                "type": "number"
-              },
-              "limit_price": {
-                "type": "number"
-              }
-            }
-          },
-          "extended_hours": {
-            "type": "boolean",
-            "default": false
-          },
-          "client_order_id": {
-            "type": [
-              "string",
-              "null"
-            ]
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
           }
         },
-        "allOf": [
-          {
-            "oneOf": [
-              {
-                "required": [
-                  "trail_price"
-                ]
-              },
-              {
-                "required": [
-                  "trail_percent"
-                ]
-              }
-            ],
-            "if": {
-              "properties": {
-                "type": {
-                  "const": "trailing_stop"
-                }
-              }
-            },
-            "then": {
-              "not": {
-                "required": [
-                  "limit_price",
-                  "stop_price",
-                  "take_profit",
-                  "stop_loss"
-                ]
-              }
-            }
-          }
-        ]
+        "type": "object",
+        "title": "HTTPValidationError"
       },
       "ValidationError": {
         "properties": {
@@ -1868,16 +1551,23 @@
         ],
         "title": "WatchlistIn"
       }
+    },
+    "securitySchemes": {
+      "EdgeApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
     }
   },
   "servers": [
     {
-      "url": "https://alpaca-py-production.up.railway.app"
+      "url": "http://localhost:8000"
     }
   ],
   "security": [
     {
-      "ApiKeyAuth": []
+      "EdgeApiKey": []
     }
   ]
 }

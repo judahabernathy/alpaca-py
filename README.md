@@ -55,10 +55,11 @@ pip install -U pip
 pip install -e ".[dev]"
 Copy-Item .env.example .env
 python -m pytest -q
-uvicorn edge.app:app --host 0.0.0.0 --port 8000
+uvicorn edge.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 
+After copying the sample file, edit `.env` to set `APCA_API_KEY_ID`, `APCA_API_SECRET_KEY`, `APCA_API_BASE_URL`, and `EDGE_API_KEY` before launching the server.
 Alpaca-py is supported on Python 3.8+.  You can install Alpaca-py using pip.
 
 Run the following command in your terminal.

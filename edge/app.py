@@ -3,6 +3,7 @@ import json
 import os
 import re
 import time
+from copy import deepcopy
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,7 +15,7 @@ import yaml
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -41,7 +42,12 @@ from .logging import (
 API_BASE_URL = APCA_API_BASE_URL
 API_KEY_ID = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY_ID")
 API_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_API_SECRET_KEY")
-EDGE_API_KEY = os.getenv("EDGE_API_KEY") or os.getenv("GATEWAY_API_KEY") or os.getenv("X_API_KEY")
+EDGE_API_KEY = (
+    os.getenv("EDGE_API_KEY")
+    or os.getenv("GATEWAY_API_KEY")
+    or os.getenv("X_API_KEY")
+    or ""
+).strip() or None
 
 configure_logging()
 
@@ -251,8 +257,17 @@ async def _request_with_retry(
 
 
 def _gateway_key() -> Optional[str]:
-    env_key = os.getenv("EDGE_API_KEY") or os.getenv("GATEWAY_API_KEY") or os.getenv("X_API_KEY")
-    attr_key = EDGE_API_KEY
+    def _normalise(value: Optional[str]) -> Optional[str]:
+        value = (value or "").strip()
+        return value or None
+
+    env_key = _normalise(os.getenv("EDGE_API_KEY"))
+    if env_key is None:
+        env_key = _normalise(os.getenv("GATEWAY_API_KEY"))
+    if env_key is None:
+        env_key = _normalise(os.getenv("X_API_KEY"))
+
+    attr_key = _normalise(EDGE_API_KEY)
     if attr_key and attr_key != env_key:
         return attr_key
     return env_key or attr_key
@@ -409,6 +424,43 @@ def healthz():
     }
 
 
+
+
+@app.get("/readyz")
+async def readyz(
+    detail: bool = Query(False),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+):
+    """Readiness probe that verifies upstream dependencies."""
+    _require_gateway_key(x_api_key)
+    client_ready = True
+    try:
+        _get_http_client()
+    except HTTPException:
+        client_ready = False
+
+    creds_ok = True
+    try:
+        _alpaca_headers()
+    except HTTPException:
+        creds_ok = False
+
+    base_url_ok = bool(API_BASE_URL)
+    dependencies = {
+        "http_client": client_ready,
+        "alpaca_credentials": creds_ok,
+        "api_base_url": base_url_ok,
+    }
+    ready = all(dependencies.values())
+    failing = [name for name, status in dependencies.items() if not status]
+    detail_payload: Any
+    if detail:
+        detail_payload = dependencies
+    else:
+        detail_payload = {"failing": failing}
+    return {"ready": ready, "detail": detail_payload}
+
+
 # -- Orders
 @app.post("/v2/orders/sync")
 def order_create_sync(
@@ -451,18 +503,71 @@ async def account_get(
     return _decode_json(headers, body)
 
 
-@app.get("/v2/orders")
-async def orders_list(
-    status: Optional[str] = Query(None),
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+@app.get("/v2/account/activities")
+async def account_activities(
+    activity_type: Optional[str] = None,
+    date: Optional[str] = None,
+    until: Optional[str] = None,
+    after: Optional[str] = None,
+    direction: Optional[str] = None,
+    page_size: Optional[int] = None,
+    page_token: Optional[str] = None,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ):
     _require_gateway_key(x_api_key)
-    params = {"status": status} if status else None
+    params = {
+        "activity_type": activity_type,
+        "date": date,
+        "until": until,
+        "after": after,
+        "direction": direction,
+        "page_size": page_size,
+        "page_token": page_token,
+    }
+    filtered = {
+        key: (str(value) if isinstance(value, (int, float)) else value)
+        for key, value in params.items()
+        if value is not None
+    }
+    status, headers, body = await _request_with_retry(
+        _get_http_client(),
+        "GET",
+        "/v2/account/activities",
+        params=filtered or None,
+    )
+    if status == 401:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": "Activities not enabled for this account; use Orders for fills.",
+            },
+        )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+    return _decode_json(headers, body)
+
+
+@app.get("/v2/orders")
+async def orders_list(
+    status: Optional[str] = None,
+    symbols: Optional[List[str]] = None,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+):
+    _require_gateway_key(x_api_key)
+    params: Dict[str, Any] = {}
+    if status:
+        params["status"] = status
+    if symbols:
+        flattened: List[str] = []
+        for value in symbols:
+            flattened.extend(part.strip() for part in value.split(",") if part.strip())
+        if flattened:
+            params["symbols"] = ",".join(flattened)
     status_code, headers, body = await _request_with_retry(
         _get_http_client(),
         "GET",
         "/v2/orders",
-        params=params,
+        params=params or None,
     )
     if status_code >= 400:
         raise HTTPException(status_code=status_code, detail=body)
@@ -750,8 +855,6 @@ except Exception:
 
 # --- GPT Actions OpenAPI patch ---
 
-SERVER_URL = 'https://alpaca-py-production.up.railway.app'
-
 def _custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -763,7 +866,8 @@ def _custom_openapi():
     )
     # Force OpenAPI 3.1 and a proper base URL for GPT Actions
     schema["openapi"] = "3.1.0"
-    schema["servers"] = [{"url": SERVER_URL}]
+    default_server = os.getenv("SERVER_URL") or "http://127.0.0.1:8000"
+    schema["servers"] = [{"url": default_server}]
 
     components = schema.setdefault("components", {})
     security_schemes = components.setdefault("securitySchemes", {})
@@ -791,36 +895,54 @@ SPEC_JSON_PATH = (Path(__file__).resolve().parent / ".well-known" / "openapi.jso
 SPEC_YAML_PATH = SPEC_JSON_PATH.with_suffix(".yaml")
 
 
-def _serve_spec_file(path: Path, media_type: str):
+def _resolve_server_url(request: Optional[Request]) -> Optional[str]:
+    if request is not None:
+        return str(request.base_url).rstrip("/")
+    env_url = os.getenv("SERVER_URL")
+    if env_url:
+        return env_url.rstrip("/")
+    return None
+
+
+def _serve_spec_file(path: Path, media_type: str, request: Optional[Request] = None):
     if path.exists():
-        return FileResponse(path, media_type=media_type)
-    spec = app.openapi()
+        if path.suffix == ".json":
+            spec: Dict[str, Any] = json.loads(path.read_text())
+        else:
+            loaded = yaml.safe_load(path.read_text())
+            spec = loaded if isinstance(loaded, dict) else {}
+    else:
+        spec = deepcopy(app.openapi())
+    spec_copy = deepcopy(spec)
+    resolved_server = _resolve_server_url(request)
+    if resolved_server:
+        spec_copy["servers"] = [{"url": resolved_server}]
     if media_type == "application/json":
-        return JSONResponse(spec)
+        return JSONResponse(spec_copy)
     return PlainTextResponse(
-        yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
+        yaml.safe_dump(spec_copy, sort_keys=False, allow_unicode=True),
         media_type=media_type,
     )
 
 
 @app.get("/.well-known/openapi.json", include_in_schema=False)
-def well_known_openapi_json():
-    return _serve_spec_file(SPEC_JSON_PATH, "application/json")
+def well_known_openapi_json(request: Request):
+    return _serve_spec_file(SPEC_JSON_PATH, "application/json", request)
 
 
 @app.get("/.well-known/openapi.yaml", include_in_schema=False)
-def well_known_openapi_yaml():
-    return _serve_spec_file(SPEC_YAML_PATH, "application/yaml")
+def well_known_openapi_yaml(request: Request):
+    return _serve_spec_file(SPEC_YAML_PATH, "application/yaml", request)
 
 
 @app.get("/openapi.json", include_in_schema=False)
-def openapi_json_alias():
-    return _serve_spec_file(SPEC_JSON_PATH, "application/json")
+def openapi_json_alias(request: Request):
+    return _serve_spec_file(SPEC_JSON_PATH, "application/json", request)
 
 
 @app.get("/openapi.yaml", include_in_schema=False)
-def openapi_yaml_alias():
-    return _serve_spec_file(SPEC_YAML_PATH, "application/yaml")
+def openapi_yaml_alias(request: Request):
+    return _serve_spec_file(SPEC_YAML_PATH, "application/yaml", request)
 
 
 # --- end patch ---
