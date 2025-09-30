@@ -7,7 +7,7 @@ from app import app
 
 schema = app.openapi()
 
-base = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("RAILWAY_STATIC_URL") or "http://localhost:8000"
+base = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("RAILWAY_STATIC_URL") or os.environ.get("SERVER_URL") or "https://alpaca-py-production.up.railway.app"
 schema["servers"] = [{"url": base}]
 
 p = schema.get("paths", {})

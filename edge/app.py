@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import yaml
 from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi.params import Param
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
@@ -549,20 +550,23 @@ async def account_activities(
 
 @app.get("/v2/orders")
 async def orders_list(
-    status: Optional[str] = None,
-    symbols: Optional[List[str]] = None,
+    status: Optional[str] = Query(None),
+    symbols: Optional[str] = Query(None),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
 ):
     _require_gateway_key(x_api_key)
     params: Dict[str, Any] = {}
-    if status:
-        params["status"] = status
-    if symbols:
-        flattened: List[str] = []
-        for value in symbols:
-            flattened.extend(part.strip() for part in value.split(",") if part.strip())
-        if flattened:
-            params["symbols"] = ",".join(flattened)
+    status_value = None if isinstance(status, Param) else status
+    symbols_value = None if isinstance(symbols, Param) else symbols
+    if status_value:
+        params["status"] = status_value
+    normalized_symbols: List[str] = []
+    if symbols_value:
+        values = symbols_value if isinstance(symbols_value, (list, tuple, set)) else [symbols_value]
+        for value in values:
+            normalized_symbols.extend(part.strip() for part in str(value).split(",") if part.strip())
+    if normalized_symbols:
+        params["symbols"] = ",".join(normalized_symbols)
     status_code, headers, body = await _request_with_retry(
         _get_http_client(),
         "GET",
@@ -866,7 +870,7 @@ def _custom_openapi():
     )
     # Force OpenAPI 3.1 and a proper base URL for GPT Actions
     schema["openapi"] = "3.1.0"
-    default_server = os.getenv("SERVER_URL") or "http://127.0.0.1:8000"
+    default_server = os.getenv("SERVER_URL") or "https://alpaca-py-production.up.railway.app"
     schema["servers"] = [{"url": default_server}]
 
     components = schema.setdefault("components", {})

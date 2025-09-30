@@ -139,6 +139,14 @@ paths:
           - type: string
           - type: 'null'
           title: Status
+      - name: symbols
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Symbols
       - name: X-API-Key
         in: header
         required: false
@@ -147,16 +155,6 @@ paths:
           - type: string
           - type: 'null'
           title: X-Api-Key
-      requestBody:
-        content:
-          application/json:
-            schema:
-              anyOf:
-              - type: array
-                items:
-                  type: string
-              - type: 'null'
-              title: Symbols
       responses:
         '200':
           description: Successful Response
@@ -917,6 +915,6 @@ components:
       in: header
       name: X-API-Key
 servers:
-- url: http://localhost:8000
+- url: https://alpaca-py-production.up.railway.app
 security:
 - EdgeApiKey: []
