@@ -250,8 +250,14 @@ async def _request_with_retry(
 
 
 
+def _gateway_key() -> Optional[str]:
+    env_key = os.getenv("EDGE_API_KEY") or os.getenv("GATEWAY_API_KEY") or os.getenv("X_API_KEY")
+    return env_key or EDGE_API_KEY
+
+
 def _require_gateway_key(header_key: Optional[str]) -> None:
-    if EDGE_API_KEY and header_key != EDGE_API_KEY:
+    expected_key = _gateway_key()
+    if expected_key and header_key != expected_key:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
