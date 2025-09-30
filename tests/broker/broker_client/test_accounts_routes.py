@@ -123,7 +123,7 @@ def test_create_account(reqmock, client: BrokerClient):
     returned_account = client.create_account(create_data)
 
     assert reqmock.called_once
-    assert type(returned_account) == Account
+    assert isinstance(returned_account, Account)
     assert returned_account.id == UUID(created_id)
     assert returned_account.kyc_results is None
 
@@ -231,7 +231,7 @@ def test_create_lct_account(reqmock, client: BrokerClient):
     returned_account = client.create_account(create_data)
 
     assert reqmock.called_once
-    assert type(returned_account) == Account
+    assert isinstance(returned_account, Account)
     assert returned_account.id == UUID(created_id)
     assert returned_account.currency == currency
     assert returned_account.kyc_results is None
@@ -334,7 +334,7 @@ def test_get_account(reqmock, client: BrokerClient):
     account = client.get_account_by_id(account_id)
 
     assert reqmock.called_once
-    assert type(account) == Account
+    assert isinstance(account, Account)
     assert account.id == UUID(account_id)
 
     assert account.kyc_results is not None
@@ -486,7 +486,7 @@ def test_update_account(reqmock, client: BrokerClient):
     account = client.update_account(account_id, update_data)
 
     assert reqmock.called_once
-    assert type(account) == Account
+    assert isinstance(account, Account)
     assert account.id == UUID(account_id)
     assert account.identity.family_name == family_name
 
@@ -618,7 +618,7 @@ def test_list_accounts_no_params(reqmock, client: BrokerClient):
     assert len(accounts) == 2
 
     for account in accounts:
-        assert type(account) == Account
+        assert isinstance(account, Account)
 
         # assert the optional fields we didn't request are None
         assert account.identity is None
@@ -745,11 +745,11 @@ def test_list_accounts_parses_entities_if_present(reqmock, client: BrokerClient)
     assert len(accounts) == 2
 
     for account in accounts:
-        assert type(account) == Account
+        assert isinstance(account, Account)
 
         # assert the optional fields we didn't request are None and the ones we did request are set
-        assert type(account.identity) == Identity
-        assert type(account.contact) == Contact
+        assert isinstance(account.identity, Identity)
+        assert isinstance(account.contact, Contact)
         assert account.disclosures is None
         assert account.documents is None
         assert account.trusted_contact is None
@@ -825,7 +825,7 @@ def test_get_trade_account_by_id(reqmock, client: BrokerClient):
     assert request.method == "GET"
     assert request.qs == {}
 
-    assert type(account) == TradeAccount
+    assert isinstance(account, TradeAccount)
     assert account.id == UUID(account_id)
 
 

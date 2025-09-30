@@ -1,22 +1,22 @@
 import os
-import requests
-from typing import Optional, Literal
+from typing import Literal, Optional
 
+import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, root_validator
 
-from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide, TimeInForce, OrderClass
-from alpaca.trading.requests import (
-    MarketOrderRequest,
-    LimitOrderRequest,
-    StopOrderRequest,
-    TrailingStopOrderRequest,
-    TakeProfitRequest,
-    StopLossRequest,
-)
 from alpaca.common.exceptions import APIError
+from alpaca.trading.client import TradingClient
+from alpaca.trading.enums import OrderClass, OrderSide, TimeInForce
+from alpaca.trading.requests import (
+    LimitOrderRequest,
+    MarketOrderRequest,
+    StopLossRequest,
+    StopOrderRequest,
+    TakeProfitRequest,
+    TrailingStopOrderRequest,
+)
 
 router = APIRouter()
 
@@ -37,8 +37,8 @@ def _side(s: str) -> OrderSide:
 def _tif(t: str) -> TimeInForce:
     try:
         return TimeInForce[(t or "day").upper()]
-    except Exception:
-        raise HTTPException(status_code=400, detail="invalid time_in_force")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="invalid time_in_force") from exc
 
 class TakeProfit(BaseModel):
     limit_price: float
@@ -72,17 +72,18 @@ class BracketOrderBody(BaseModel):
 def _submit(req):
     try:
         return _client().submit_order(req)
-    except APIError as e:
-        detail = getattr(e, "error", None) or str(e)
-        raise HTTPException(status_code=403, detail=detail)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except APIError as exc:
+        detail = getattr(exc, "error", None) or str(exc)
+        raise HTTPException(status_code=403, detail=detail) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 @router.post("/v1/order/bracket", tags=["Orders"])
 def place_bracket(body: BracketOrderBody):
     # Price safety check uses IEX feed (works on free plans)
     try:
-        k = os.getenv("APCA_API_KEY_ID"); s = os.getenv("APCA_API_SECRET_KEY")
+        k = os.getenv("APCA_API_KEY_ID")
+        s = os.getenv("APCA_API_SECRET_KEY")
         if k and s:
             r = requests.get(
                 f"https://data.alpaca.markets/v2/stocks/{body.symbol}/trades/latest?feed=iex",
@@ -175,7 +176,8 @@ class TrailingOrderBody(BaseModel):
 
     @root_validator(skip_on_failure=True)
     def _validate_trail(cls, v):
-        tp = v.get("trail_price"); pc = v.get("trail_percent")
+        tp = v.get("trail_price")
+        pc = v.get("trail_percent")
         if (tp is None and pc is None) or (tp is not None and pc is not None):
             raise ValueError("Provide either trail_price or trail_percent, not both")
         if (v.get("qty") is None) == (v.get("notional") is None):

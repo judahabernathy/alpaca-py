@@ -1,4 +1,3 @@
-from typing import Iterator
 from uuid import UUID
 
 from requests_mock import Mocker

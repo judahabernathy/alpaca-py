@@ -13,14 +13,12 @@ from alpaca.broker.models import (
     Bank,
     Transfer,
 )
-
 from alpaca.broker.requests import (
     CreateACHRelationshipRequest,
     CreateACHTransferRequest,
     CreateBankRequest,
     GetTransfersRequest,
 )
-
 from alpaca.common.enums import BaseURL, PaginationType
 
 

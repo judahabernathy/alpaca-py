@@ -1,42 +1,40 @@
 from datetime import datetime
+from uuid import uuid4
 
 import pytest
 
-from alpaca.broker.requests import (
-    UploadDocumentMimeType,
-    UploadDocumentRequest,
-    UploadDocumentSubType,
-    DocumentType,
-    UploadW8BenDocumentRequest,
-    W8BenDocument,
-    CreateJournalRequest,
+from alpaca.broker.enums import (
+    IdentifierType,
+    JournalEntryType,
+    TransferDirection,
+    TransferTiming,
+    TransferType,
 )
 from alpaca.broker.models import (
     AccountDocument,
     TradeDocument,
 )
 from alpaca.broker.requests import (
-    UpdateAccountRequest,
-    UpdatableTrustedContact,
-    UpdatableContact,
-    UpdatableIdentity,
-    UpdatableDisclosures,
+    CreateACHTransferRequest,
+    CreateBankRequest,
+    CreateBankTransferRequest,
+    CreateJournalRequest,
+    DocumentType,
     GetAccountActivitiesRequest,
     GetTradeDocumentsRequest,
-    CreateBankRequest,
-    CreateACHTransferRequest,
-    CreateBankTransferRequest,
-)
-from alpaca.broker.enums import (
-    IdentifierType,
-    TransferType,
-    TransferDirection,
-    TransferTiming,
-    JournalEntryType,
+    UpdatableContact,
+    UpdatableDisclosures,
+    UpdatableIdentity,
+    UpdatableTrustedContact,
+    UpdateAccountRequest,
+    UploadDocumentMimeType,
+    UploadDocumentRequest,
+    UploadDocumentSubType,
+    UploadW8BenDocumentRequest,
+    W8BenDocument,
 )
 from alpaca.trading.enums import ActivityType
 from tests.broker.factories import create_dummy_w8ben_document
-from uuid import uuid4
 
 
 def test_document_validates_id():

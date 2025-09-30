@@ -1,12 +1,14 @@
-from alpaca.trading.enums import OrderSide, OrderType, TimeInForce, OrderClass
-from alpaca.trading.requests import (
-    MarketOrderRequest,
-    TrailingStopOrderRequest,
-    LimitOrderRequest,
-    OptionLegRequest,
-)
-import pytest
 import warnings
+
+import pytest
+
+from alpaca.trading.enums import OrderClass, OrderSide, OrderType, TimeInForce
+from alpaca.trading.requests import (
+    LimitOrderRequest,
+    MarketOrderRequest,
+    OptionLegRequest,
+    TrailingStopOrderRequest,
+)
 
 
 def test_has_qty_or_notional_but_not_both():
@@ -98,7 +100,8 @@ def test_mleg_options() -> None:
                 o = MarketOrderRequest(**kwargs)
                 if warn_validated:
                     warnings.warn(
-                        f"MarketOrderRequest({kwargs_as_string(**kwargs)}) passed validation!"
+                        f"MarketOrderRequest({kwargs_as_string(**kwargs)}) passed validation!",
+                        stacklevel=2,
                     )
                 return o
 
@@ -108,7 +111,8 @@ def test_mleg_options() -> None:
                 o = LimitOrderRequest(limit_price=1, **kwargs)
                 if warn_validated:
                     warnings.warn(
-                        f"LimitOrderRequest({kwargs_as_string(**kwargs)}) passed validation!"
+                        f"LimitOrderRequest({kwargs_as_string(**kwargs)}) passed validation!",
+                        stacklevel=2,
                     )
                 return o
 

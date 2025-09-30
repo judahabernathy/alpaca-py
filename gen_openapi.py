@@ -1,4 +1,8 @@
-import os, json, yaml
+import json
+import os
+
+import yaml
+
 from app import app
 
 schema = app.openapi()

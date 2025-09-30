@@ -3,19 +3,16 @@ from uuid import UUID
 from alpaca.broker.client import (
     BrokerClient,
 )
-
 from alpaca.broker.enums import JournalEntryType
-
 from alpaca.broker.models import (
-    Journal,
     BatchJournalResponse,
+    Journal,
 )
-
 from alpaca.broker.requests import (
+    CreateBatchJournalRequest,
+    CreateJournalRequest,
     CreateReverseBatchJournalRequest,
     GetJournalsRequest,
-    CreateJournalRequest,
-    CreateBatchJournalRequest,
 )
 from alpaca.common.enums import BaseURL, SupportedCurrencies
 
@@ -277,7 +274,7 @@ def test_get_journal_by_id(reqmock, client: BrokerClient):
     assert response.id == UUID(journal_id)
 
 
-def test_get_journal_by_id(reqmock, client: BrokerClient):
+def test_cancel_journal_by_id(reqmock, client: BrokerClient):
     journal_id = "0a9152c4-d232-4b00-9102-5fa19aca40cb"
 
     reqmock.delete(

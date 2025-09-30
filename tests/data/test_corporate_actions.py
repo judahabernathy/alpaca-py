@@ -314,7 +314,7 @@ def test_get_corporate_actions(
     assert cash_dividend.process_date == date(2023, 5, 19)
 
     cash_dividend = res["cash_dividends"][1]
-    cash_dividend.symbol == "ZMTBY"
+    assert cash_dividend.symbol == "ZMTBY"
 
     assert res["cash_mergers"][0].acquiree_symbol == "GLOP"
     assert res["stock_mergers"][0].acquirer_symbol == "EXR"

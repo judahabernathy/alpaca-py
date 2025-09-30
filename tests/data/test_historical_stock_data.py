@@ -201,7 +201,7 @@ def test_multisymbol_get_bars(reqmock, stock_client: StockHistoricalDataClient):
 
     barset = stock_client.get_stock_bars(request_params=request)
 
-    assert type(barset) == BarSet
+    assert isinstance(barset, BarSet)
 
     assert barset["TSLA"][0].open == 839
     assert barset["AAPL"][0].low == 159.41
@@ -615,7 +615,7 @@ def test_get_latest_trade(reqmock, stock_client: StockHistoricalDataClient):
     symbol = "AAPL"
 
     reqmock.get(
-        f"https://data.alpaca.markets/v2/stocks/trades/latest?symbols=AAPL&feed=IEX",
+        "https://data.alpaca.markets/v2/stocks/trades/latest?symbols=AAPL&feed=IEX",
         text="""
 {
     "trades": {
@@ -734,7 +734,7 @@ def test_get_latest_quote(reqmock, stock_client: StockHistoricalDataClient):
     symbol = "AAPL"
 
     reqmock.get(
-        f"https://data.alpaca.markets/v2/stocks/quotes/latest?symbols=AAPL",
+        "https://data.alpaca.markets/v2/stocks/quotes/latest?symbols=AAPL",
         text="""
 {
     "quotes": {
@@ -804,7 +804,7 @@ def test_get_snapshot(reqmock, stock_client: StockHistoricalDataClient):
     symbol = "AAPL"
 
     reqmock.get(
-        f"https://data.alpaca.markets/v2/stocks/snapshots?symbols=AAPL",
+        "https://data.alpaca.markets/v2/stocks/snapshots?symbols=AAPL",
         text="""
 {
     "AAPL": {
@@ -913,7 +913,7 @@ def test_get_snapshot_multi_empty_response(
 def test_stock_latest_bar(reqmock, stock_client: StockHistoricalDataClient):
     symbol = "SPY"
     reqmock.get(
-        f"https://data.alpaca.markets/v2/stocks/bars/latest?symbols=SPY",
+        "https://data.alpaca.markets/v2/stocks/bars/latest?symbols=SPY",
         text="""
 {
     "bars": {

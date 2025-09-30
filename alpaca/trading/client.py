@@ -1,4 +1,3 @@
-import json
 import warnings
 from typing import List, Optional, Union
 from uuid import UUID
@@ -166,7 +165,7 @@ class TradingClient(RESTClient):
         """
         params = {"client_order_id": client_id}
 
-        response = self.get(f"/orders:by_client_order_id", params)
+        response = self.get("/orders:by_client_order_id", params)
 
         if self._use_raw_data:
             return response
@@ -207,7 +206,7 @@ class TradingClient(RESTClient):
         Returns:
             List[CancelOrderResponse]: The list of HTTP statuses for each order attempted to be cancelled.
         """
-        response = self.delete(f"/orders")
+        response = self.delete("/orders")
 
         if self._use_raw_data:
             return response
@@ -362,7 +361,7 @@ class TradingClient(RESTClient):
             PortfolioHistory: The portfolio history statistics for the account.
         """
         response = self.get(
-            f"/account/portfolio/history",
+            "/account/portfolio/history",
             history_filter.to_request_fields() if history_filter else {},
         )
 
@@ -389,7 +388,7 @@ class TradingClient(RESTClient):
         # checking to see if we specified at least one param
         params = filter.to_request_fields() if filter is not None else {}
 
-        response = self.get(f"/assets", params)
+        response = self.get("/assets", params)
 
         if self._use_raw_data:
             return response
@@ -524,7 +523,7 @@ class TradingClient(RESTClient):
             List[Watchlist]: The list of all watchlists.
         """
 
-        result = self.get(f"/watchlists")
+        result = self.get("/watchlists")
 
         if self._use_raw_data:
             return result
@@ -693,6 +692,7 @@ class TradingClient(RESTClient):
             "get_corporate_announcements is deprecated and will be removed in a future version."
             "Please use alpaca.data.historical.corporate_actions.CorporateActionsClient.get_corporate_actions() instead",
             DeprecationWarning,
+            stacklevel=2,
         )
 
         params = filter.to_request_fields() if filter else {}

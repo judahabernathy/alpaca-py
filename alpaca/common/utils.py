@@ -1,6 +1,6 @@
-from typing import Union, Optional
-from uuid import UUID
 from datetime import datetime
+from typing import Optional, Union
+from uuid import UUID
 
 
 def validate_uuid_id_param(
@@ -24,9 +24,9 @@ def validate_uuid_id_param(
         var_name = "account_id"
 
     # should raise ValueError
-    if type(id) == str:
+    if isinstance(id, str):
         id = UUID(id)
-    elif type(id) != UUID:
+    elif not isinstance(id, UUID):
         raise ValueError(f"{var_name} must be a UUID or a UUID str")
 
     return id

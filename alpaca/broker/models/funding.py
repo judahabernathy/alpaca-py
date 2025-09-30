@@ -6,11 +6,11 @@ from alpaca.broker.enums import (
     ACHRelationshipStatus,
     BankAccountType,
     BankStatus,
-    IdentifierType,
-    TransferType,
-    TransferStatus,
-    TransferDirection,
     FeePaymentMethod,
+    IdentifierType,
+    TransferDirection,
+    TransferStatus,
+    TransferType,
 )
 from alpaca.common.models import ModelWithID
 

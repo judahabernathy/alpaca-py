@@ -1,7 +1,6 @@
-from collections import defaultdict
 from typing import Dict, Type
 
-from alpaca.common import HTTPResult, RawData
+from alpaca.common import RawData
 
 """
 These functions were created and put in this file to handle all of the edge cases

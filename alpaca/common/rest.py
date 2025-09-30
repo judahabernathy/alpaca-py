@@ -1,29 +1,27 @@
-from collections import defaultdict
-from collections.abc import Callable
-import time
 import base64
-from abc import ABC
-from typing import Any, Dict, List, Optional, Type, Union, Tuple, Iterator
+import time
+from collections import defaultdict
+from itertools import chain
+from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 from pydantic import BaseModel
 from requests import Session
 from requests.exceptions import HTTPError
-from itertools import chain
-
-from alpaca.common.constants import (
-    DEFAULT_RETRY_ATTEMPTS,
-    DEFAULT_RETRY_WAIT_SECONDS,
-    DEFAULT_RETRY_EXCEPTION_CODES,
-)
 
 from alpaca import __version__
+from alpaca.common.constants import (
+    DEFAULT_RETRY_ATTEMPTS,
+    DEFAULT_RETRY_EXCEPTION_CODES,
+    DEFAULT_RETRY_WAIT_SECONDS,
+)
 from alpaca.common.exceptions import APIError, RetryException
-from alpaca.common.types import RawData, HTTPResult, Credentials
+from alpaca.common.types import Credentials, HTTPResult, RawData
+
 from .constants import PageItem
-from .enums import PaginationType, BaseURL
+from .enums import BaseURL, PaginationType
 
 
-class RESTClient(ABC):
+class RESTClient:
     """Abstract base class for REST clients"""
 
     def __init__(
@@ -199,12 +197,12 @@ class RESTClient(ABC):
         except HTTPError as http_error:
             # retry if we hit Rate Limit
             if response.status_code in self._retry_codes and retry > 0:
-                raise RetryException()
+                raise RetryException() from http_error
 
             # raise API error for all other errors
             error = response.text
 
-            raise APIError(error, http_error)
+            raise APIError(error, http_error) from http_error
 
         if response.text != "":
             return response.json()

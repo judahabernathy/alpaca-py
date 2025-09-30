@@ -5,7 +5,6 @@ from msgpack.ext import Timestamp
 from pytz import utc
 
 from alpaca.data.enums import Exchange
-from alpaca.data.models import Bar, Trade, News
 from alpaca.data.live.websocket import DataStream
 from alpaca.data.models import Bar, Trade
 from alpaca.data.models.news import News
@@ -47,7 +46,7 @@ def test_cast(ws_client: DataStream, raw_ws_client: DataStream, timestamp: Times
             "vw": 177.987562,
         },
     )
-    assert type(bar) == Bar
+    assert isinstance(bar, Bar)
     assert bar.symbol == "AAPL"
     assert bar.high == 178.005
 
@@ -64,7 +63,7 @@ def test_cast(ws_client: DataStream, raw_ws_client: DataStream, timestamp: Times
             "t": timestamp,
         },
     )
-    assert type(trade) == Trade
+    assert isinstance(trade, Trade)
     assert trade.symbol == "AAPL"
     assert trade.price == 177.79
     assert trade.exchange == Exchange.V
@@ -84,7 +83,7 @@ def test_cast(ws_client: DataStream, raw_ws_client: DataStream, timestamp: Times
             "t": timestamp,
         },
     )
-    assert type(quote) == Quote
+    assert isinstance(quote, Quote)
     assert quote.symbol == "SPIP"
     assert quote.bid_price == 25.41
     assert quote.ask_size == 35
@@ -99,7 +98,7 @@ def test_cast(ws_client: DataStream, raw_ws_client: DataStream, timestamp: Times
             "a": [{"p": 65128.1, "s": 1.6542}],
         },
     )
-    assert type(orderbook) == Orderbook
+    assert isinstance(orderbook, Orderbook)
     assert orderbook.symbol == "BTC/USD"
     assert orderbook.bids == [OrderbookQuote(p=65128.1, s=1.6542)]
 
@@ -115,7 +114,7 @@ def test_cast(ws_client: DataStream, raw_ws_client: DataStream, timestamp: Times
             "z": "C",
         },
     )
-    assert type(trading_status) == TradingStatus
+    assert isinstance(trading_status, TradingStatus)
     assert trading_status.status_code == "T"
 
     cancel = ws_client._cast(
@@ -131,7 +130,7 @@ def test_cast(ws_client: DataStream, raw_ws_client: DataStream, timestamp: Times
             "t": timestamp,
         },
     )
-    assert type(cancel) == TradeCancel
+    assert isinstance(cancel, TradeCancel)
     assert cancel.id == 4868
     assert cancel.exchange == "D"
     assert cancel.price == 36.18
@@ -152,7 +151,7 @@ def test_cast(ws_client: DataStream, raw_ws_client: DataStream, timestamp: Times
             "source": "benzinga",
         },
     )
-    assert type(news) == News
+    assert isinstance(news, News)
     assert news.id == 39358670
     assert news.symbols == ["AVGO"]
     assert news.created_at == created_at
@@ -172,7 +171,7 @@ def test_cast(ws_client: DataStream, raw_ws_client: DataStream, timestamp: Times
             "vw": 177.987562,
         },
     )
-    assert type(raw_bar) == dict
+    assert isinstance(raw_bar, dict)
     assert raw_bar["S"] == "AAPL"
     assert raw_bar["h"] == 178.005
 
@@ -211,7 +210,7 @@ async def test_dispatch(ws_client: DataStream, timestamp: Timestamp):
     assert len(articles_a) == 1
     assert len(articles_b) == 0
     assert len(articles_star) == 0
-    assert type(articles_a[0]) == News
+    assert isinstance(articles_a[0], News)
     assert articles_a[0].summary == "a"
 
     msg_b = msg_a.copy()

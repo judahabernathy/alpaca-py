@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import Dict, Optional, Union
 
 from alpaca.common.enums import BaseURL
@@ -86,7 +85,7 @@ class OptionHistoricalDataClient(RESTClient):
 
         # paginated get request for market data api
         raw_bars = self._get_marketdata(
-            path=f"/options/bars",
+            path="/options/bars",
             params=request_params.to_request_fields(),
             page_size=10_000,
         )
@@ -125,7 +124,7 @@ class OptionHistoricalDataClient(RESTClient):
             Union[Dict[str, Quote], RawData]: The latest quote in raw or wrapped format
         """
         raw_latest_quotes = self._get_marketdata(
-            path=f"/options/quotes/latest",
+            path="/options/quotes/latest",
             params=request_params.to_request_fields(),
         )
 
@@ -146,7 +145,7 @@ class OptionHistoricalDataClient(RESTClient):
             Union[Dict[str, Trade], RawData]: The latest trade in raw or wrapped format
         """
         raw_latest_trades = self._get_marketdata(
-            path=f"/options/trades/latest",
+            path="/options/trades/latest",
             params=request_params.to_request_fields(),
         )
 
@@ -167,7 +166,7 @@ class OptionHistoricalDataClient(RESTClient):
             Union[TradeSet, RawData]: The trade data either in raw or wrapped form
         """
         raw_trades = self._get_marketdata(
-            path=f"/options/trades",
+            path="/options/trades",
             params=request_params.to_request_fields(),
             page_size=10_000,
         )
@@ -190,7 +189,7 @@ class OptionHistoricalDataClient(RESTClient):
             Union[Dict[str, OptionsSnapshot], RawData]: The snapshot data either in raw or wrapped form
         """
         raw_snapshots = self._get_marketdata(
-            path=f"/options/snapshots",
+            path="/options/snapshots",
             params=request_params.to_request_fields(),
             page_limit=1000,
             page_size=1000,

@@ -1,32 +1,35 @@
-from alpaca.common.models import ModelWithID, ValidateBaseModel as BaseModel
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
-from datetime import datetime, date
-from typing import Any, Optional, List, Union, Dict
+
+from pydantic import Field
+
+from alpaca.common.models import ModelWithID
+from alpaca.common.models import ValidateBaseModel as BaseModel
 from alpaca.trading.enums import (
+    AccountStatus,
+    ActivityType,
     AssetClass,
-    AssetStatus,
     AssetExchange,
+    AssetStatus,
     ContractType,
+    CorporateActionSubType,
+    CorporateActionType,
     DTBPCheck,
     ExerciseStyle,
+    NonTradeActivityStatus,
+    OrderClass,
+    OrderSide,
     OrderStatus,
     OrderType,
-    OrderClass,
     PDTCheck,
     PositionIntent,
-    TimeInForce,
-    OrderSide,
     PositionSide,
-    AccountStatus,
+    TimeInForce,
     TradeActivityType,
-    NonTradeActivityStatus,
-    ActivityType,
-    CorporateActionType,
-    CorporateActionSubType,
     TradeConfirmationEmail,
     TradeEvent,
 )
-from pydantic import Field, model_validator
 
 
 class Asset(ModelWithID):
@@ -407,7 +410,7 @@ class BaseActivity(BaseModel):
     activity_type: ActivityType
 
     def __init__(self, *args, **data):
-        if "account_id" in data and type(data["account_id"]) == str:
+        if "account_id" in data and isinstance(data["account_id"], str):
             data["account_id"] = UUID(data["account_id"])
 
         super().__init__(*args, **data)

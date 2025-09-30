@@ -1,5 +1,6 @@
 import warnings
 from uuid import UUID
+
 import pytest
 
 from alpaca.common.enums import BaseURL
@@ -647,7 +648,8 @@ def test_mleg_request_validation() -> None:
                 o = MarketOrderRequest(**kwargs)
                 if warn_validated:
                     warnings.warn(
-                        f"MarketOrderRequest({kwargs_as_string(**kwargs)}) passed validation!"
+                        f"MarketOrderRequest({kwargs_as_string(**kwargs)}) passed validation!",
+                        stacklevel=2,
                     )
                 return o
 
@@ -657,7 +659,8 @@ def test_mleg_request_validation() -> None:
                 o = LimitOrderRequest(limit_price=1, **kwargs)
                 if warn_validated:
                     warnings.warn(
-                        f"LimitOrderRequest({kwargs_as_string(**kwargs)}) passed validation!"
+                        f"LimitOrderRequest({kwargs_as_string(**kwargs)}) passed validation!",
+                        stacklevel=2,
                     )
                 return o
 
