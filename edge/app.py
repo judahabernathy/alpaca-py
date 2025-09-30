@@ -79,6 +79,8 @@ async def correlation_middleware(request: Request, call_next):
     start_time = time.perf_counter()
     try:
         log_event("incoming_request", method=request.method, path=str(request.url.path))
+        api_key_header = request.headers.get("X-API-Key")
+        log_event("gateway_key_header", present=bool(api_key_header), length=len(api_key_header or ""))
         response = await call_next(request)
         response.headers.setdefault("X-Correlation-ID", correlation_id)
         log_duration("request_complete", start_time, status=response.status_code)
