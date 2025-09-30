@@ -252,7 +252,10 @@ async def _request_with_retry(
 
 def _gateway_key() -> Optional[str]:
     env_key = os.getenv("EDGE_API_KEY") or os.getenv("GATEWAY_API_KEY") or os.getenv("X_API_KEY")
-    return env_key or EDGE_API_KEY
+    attr_key = EDGE_API_KEY
+    if attr_key and attr_key != env_key:
+        return attr_key
+    return env_key or attr_key
 
 
 def _require_gateway_key(header_key: Optional[str]) -> None:
