@@ -3,16 +3,51 @@ import json
 import os
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pytest
 from fastapi import HTTPException
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import JSONResponse, Response
 from starlette.requests import Request
+from urllib.parse import urlencode
 
 import edge.app as app
 import edge.http as edge_http
 import edge.logging as edge_logging
+import edge.extras as extras
+
+
+
+
+def build_request(
+    path: str,
+    *,
+    method: str = "GET",
+    headers: Optional[Dict[str, Any]] = None,
+    query: Optional[Dict[str, Any]] = None,
+) -> Request:
+    query_string = urlencode(query or {}, doseq=True)
+    scope = {
+        "type": "http",
+        "method": method,
+        "path": path,
+        "query_string": query_string.encode("utf-8"),
+        "headers": [
+            (str(key).lower().encode("latin-1"), str(value).encode("latin-1"))
+            for key, value in (headers or {}).items()
+        ],
+        "server": ("testserver", 80),
+        "scheme": "http",
+    }
+
+    async def receive():
+        return {"type": "http.request"}
+
+    return Request(scope, receive)
+
+
+def gateway_request(path: str, *, method: str = "GET", query: Optional[Dict[str, Any]] = None) -> Request:
+    return build_request(path, method=method, headers={"X-API-Key": "edge-key"}, query=query)
 
 
 def test_legacy_app_module_reexports_edge_helpers():
@@ -86,6 +121,8 @@ async def test_edge_http_client_request_injects_correlation(monkeypatch):
     monkeypatch.setattr(edge_http, "log_request", lambda method, url, status, latency_s, **fields: logged.append((method, url, status)))
     monkeypatch.setattr(edge_http, "log_error", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("log_error should not be called")))
     monkeypatch.setattr(edge_http, "get_correlation_id", lambda: "cid-123")
+    monkeypatch.setenv("APCA_API_KEY_ID", "id")
+    monkeypatch.setenv("APCA_API_SECRET_KEY", "secret")
 
     client = edge_http.EdgeHttpClient("https://service")
     await client.startup()
@@ -132,6 +169,8 @@ async def test_edge_http_client_logs_errors(monkeypatch):
     monkeypatch.setattr(edge_http, "log_request", lambda *args, **kwargs: None)
     monkeypatch.setattr(edge_http, "log_error", lambda event, **fields: errors.append((event, fields)))
     monkeypatch.setattr(edge_http, "get_correlation_id", lambda: None)
+    monkeypatch.setenv("APCA_API_KEY_ID", "id")
+    monkeypatch.setenv("APCA_API_SECRET_KEY", "secret")
 
     client = edge_http.EdgeHttpClient("https://service")
     await client.startup()
@@ -298,7 +337,6 @@ async def test_request_with_retry_bubbles_429(monkeypatch):
         async def request(self, method: str, path: str, headers=None, **kwargs: Any):
             return 429, {"Retry-After": "2"}, "rate limited"
 
-    monkeypatch.setattr(app, "_alpaca_headers", lambda: {})
 
     with pytest.raises(HTTPException) as excinfo:
         await app._request_with_retry(FakeHttpClient(), "GET", "/example")
@@ -488,7 +526,6 @@ async def test_request_with_retry_default_delay(monkeypatch):
     async def fake_sleep(delay):
         sleeps.append(delay)
 
-    monkeypatch.setattr(app, "_alpaca_headers", lambda: {})
     monkeypatch.setattr(app.asyncio, "sleep", fake_sleep)
 
     with pytest.raises(HTTPException) as excinfo:
@@ -511,7 +548,6 @@ async def test_request_with_retry_honors_max_attempts(monkeypatch):
             return 429, {"Retry-After": "1"}, "rate limited"
 
     client = FakeHttpClient()
-    monkeypatch.setattr(app, "_alpaca_headers", lambda: {})
 
     with pytest.raises(HTTPException) as excinfo:
         await app._request_with_retry(client, "GET", "/example")
@@ -562,39 +598,50 @@ async def test_gateway_routes_and_market_data(monkeypatch):
 
     fake_client = FakeHttpClient(responses)
     monkeypatch.delenv("EDGE_API_KEY", raising=False)
-    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
     monkeypatch.delenv("X_API_KEY", raising=False)
     monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
     monkeypatch.setattr(app, "_get_http_client", lambda: fake_client)
-    monkeypatch.setattr(app, "_alpaca_headers", lambda: {"APCA-API-KEY-ID": "id", "APCA-API-SECRET-KEY": "secret"})
 
-    account = await app.account_get(x_api_key="edge-key")
+    account = await app.account_get(gateway_request("/v2/account"))
     assert account == {"id": "acct"}
 
-    orders = await app.orders_list(status=None, x_api_key="edge-key")
-    assert orders == [{"id": "order"}]
+    orders = await app.orders_list(gateway_request('/v2/orders'))
+    orders_payload = json.loads(orders.body.decode())
+    assert orders_payload == [{'id': 'order'}]
 
-    filtered = await app.orders_list(status="open", symbols=["AAPL", "MSFT"], x_api_key="edge-key")
-    assert filtered == [{"id": "filtered"}]
+    filtered = await app.orders_list(
+        gateway_request('/v2/orders', query={'status': 'open', 'symbols': 'AAPL,MSFT'})
+    )
+    filtered_payload = json.loads(filtered.body.decode())
+    assert filtered_payload == [{'id': 'filtered'}]
 
-    order = await app.orders_get_by_id("abc", x_api_key="edge-key")
-    assert order["id"] == "abc"
+    order = await app.orders_get_by_id('abc', gateway_request('/v2/orders/abc'))
+    order_payload = json.loads(order.body.decode())
+    assert order_payload['id'] == 'abc'
 
-    await app.positions_list_v2(x_api_key="edge-key")
-    await app.positions_get("AAPL", x_api_key="edge-key")
-    await app.positions_close_all(cancel_orders=False, x_api_key="edge-key")
-    await app.positions_close("AAPL", cancel_orders=False, x_api_key="edge-key")
+    await app.positions_list_v2(gateway_request('/v2/positions'))
+    await app.positions_get("AAPL", gateway_request("/v2/positions/AAPL"))
+    await app.positions_close_all(gateway_request("/v2/positions", method="DELETE"), cancel_orders=False)
+    await app.positions_close(
+        "AAPL", gateway_request("/v2/positions/AAPL", method="DELETE"), cancel_orders=False
+    )
 
     watchlist_request = app.WatchlistIn(name="wl", symbols=["AAPL"])
-    await app.watchlists_list_v2(x_api_key="edge-key")
-    await app.watchlists_create_v2(watchlist_request, x_api_key="edge-key")
-    await app.watchlists_get_v2("wl", x_api_key="edge-key")
-    await app.watchlists_update_v2("wl", watchlist_request, x_api_key="edge-key")
-    delete_resp = await app.watchlists_delete_v2("wl", x_api_key="edge-key")
+    await app.watchlists_list_v2(gateway_request("/v2/watchlists"))
+    await app.watchlists_create_v2(
+        watchlist_request, gateway_request("/v2/watchlists", method="POST")
+    )
+    await app.watchlists_get_v2("wl", gateway_request("/v2/watchlists/wl"))
+    await app.watchlists_update_v2(
+        "wl", watchlist_request, gateway_request("/v2/watchlists/wl", method="PUT")
+    )
+    delete_resp = await app.watchlists_delete_v2("wl", gateway_request("/v2/watchlists/wl", method="DELETE"))
     assert isinstance(delete_resp, Response)
     assert delete_resp.status_code == 204
 
-    activities = await app.account_activities(direction="desc", x_api_key="edge-key")
+    activities = await app.account_activities(
+        gateway_request("/v2/account/activities", query={"direction": "desc"}), direction="desc"
+    )
     assert activities == []
 
     class FakeFrame:
@@ -618,22 +665,37 @@ async def test_gateway_routes_and_market_data(monkeypatch):
             return SimpleNamespace(df=FakeFrame([{"bar": 1}]))
 
     monkeypatch.setattr(app, "md_client", lambda: FakeMarketData())
-    quotes = app.get_quotes_v2("AAPL", "2024-01-01T00:00:00+00:00", "2024-01-02T00:00:00+00:00", x_api_key="edge-key")
-    trades = app.get_trades_v2("AAPL", "2024-01-01T00:00:00+00:00", "2024-01-02T00:00:00+00:00", x_api_key="edge-key")
-    bars = app.get_bars_v2("AAPL", timeframe="1Day", start="2024-01-01T00:00:00", end="2024-01-02T00:00:00", x_api_key="edge-key")
+    quotes = app.get_quotes_v2(
+        gateway_request("/v2/quotes"),
+        "AAPL",
+        "2024-01-01T00:00:00+00:00",
+        "2024-01-02T00:00:00+00:00",
+    )
+    trades = app.get_trades_v2(
+        gateway_request("/v2/trades"),
+        "AAPL",
+        "2024-01-01T00:00:00+00:00",
+        "2024-01-02T00:00:00+00:00",
+    )
+    bars = app.get_bars_v2(
+        gateway_request("/v2/bars"),
+        "AAPL",
+        timeframe="1Day",
+        start="2024-01-01T00:00:00",
+        end="2024-01-02T00:00:00",
+    )
 
     assert quotes[0]["symbol"] == "AAPL"
     assert trades[0]["trade"] == 1
     assert bars[0]["bar"] == 1
     assert fake_client._responses == []
 
-@pytest.mark.asyncio
-async def test_spec_serving(monkeypatch, tmp_path):
+def test_spec_serving(monkeypatch):
 
     async def _receive():
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    request_scope = {
+    scope = {
         "type": "http",
         "method": "GET",
         "path": "/.well-known/openapi.json",
@@ -643,27 +705,13 @@ async def test_spec_serving(monkeypatch, tmp_path):
         "scheme": "http",
     }
 
-    request = Request(request_scope, _receive)
+    request = Request(scope, _receive)
 
-    path_json = tmp_path / "openapi.json"
-    path_json.write_text('{"openapi": "3.1.0"}')
-
-    file_resp = app._serve_spec_file(path_json, "application/json", request)
-    assert isinstance(file_resp, JSONResponse)
-    body = json.loads(file_resp.body.decode())
-    assert body["servers"][0]["url"] == "http://127.0.0.1:8000"
-
-    missing = tmp_path / "missing.yaml"
-    json_resp = app._serve_spec_file(missing, "application/json", request)
-    assert isinstance(json_resp, JSONResponse)
-
-    yaml_resp = app._serve_spec_file(missing, "application/yaml", request)
-    assert isinstance(yaml_resp, PlainTextResponse)
-
-    spec = app._custom_openapi()
-    desc = spec["info"]["description"]
-    assert "rate" in desc
-    assert "Retry-After" in desc
+    response = extras.well_known_openapi(request)
+    assert isinstance(response, JSONResponse)
+    schema = json.loads(response.body.decode())
+    assert schema["servers"][0]["url"] == "http://127.0.0.1:8000"
+    assert schema["security"] == [{"EdgeApiKey": []}]
 
 def test_order_payload_from_model_variants():
 
@@ -734,8 +782,8 @@ async def test_submit_order_async_invalid_json(monkeypatch):
 async def test_order_create_endpoint(monkeypatch):
     payloads = {}
 
-    def fake_require(header):
-        payloads['auth'] = header
+    def fake_require(request: Request):
+        payloads['auth'] = app._gateway_header_value(request)
 
     def fake_payload(model):
         return {'symbol': model.symbol}
@@ -744,23 +792,23 @@ async def test_order_create_endpoint(monkeypatch):
         payloads['submitted'] = payload
         return {'ok': True}
 
-    monkeypatch.setattr(app, "_require_gateway_key", fake_require)
-    monkeypatch.setattr(app, "_order_payload_from_model", fake_payload)
-    monkeypatch.setattr(app, "_submit_order_async", fake_submit)
+    monkeypatch.setattr(app, '_require_gateway_key_from_request', fake_require)
+    monkeypatch.setattr(app, '_order_payload_from_model', fake_payload)
+    monkeypatch.setattr(app, '_submit_order_async', fake_submit)
 
-    model = app.CreateOrder(symbol="AAPL", side="buy", type="market", time_in_force="day")
-    result = await app.order_create(model, x_api_key="key")
+    model = app.CreateOrder(symbol='AAPL', side='buy', type='market', time_in_force='day')
+    result = await app.order_create(model, gateway_request('/v2/orders', method='POST'))
 
     assert result == {'ok': True}
-    assert payloads['auth'] == "key"
+    assert payloads['auth'] == 'edge-key'
     assert payloads['submitted'] == {'symbol': 'AAPL'}
 
 
 def test_order_create_sync_endpoint(monkeypatch):
     payloads = {}
 
-    def fake_require(header):
-        payloads['auth'] = header
+    def fake_require(request: Request):
+        payloads['auth'] = app._gateway_header_value(request)
 
     def fake_payload(model):
         return {'symbol': model.symbol}
@@ -769,15 +817,15 @@ def test_order_create_sync_endpoint(monkeypatch):
         payloads['submitted'] = payload
         return {'ok': True}
 
-    monkeypatch.setattr(app, "_require_gateway_key", fake_require)
-    monkeypatch.setattr(app, "_order_payload_from_model", fake_payload)
-    monkeypatch.setattr(app, "_submit_order_sync", fake_submit)
+    monkeypatch.setattr(app, '_require_gateway_key_from_request', fake_require)
+    monkeypatch.setattr(app, '_order_payload_from_model', fake_payload)
+    monkeypatch.setattr(app, '_submit_order_sync', fake_submit)
 
-    model = app.CreateOrder(symbol="AAPL", side="buy", type="market", time_in_force="day")
-    result = app.order_create_sync(model, x_api_key="key")
+    model = app.CreateOrder(symbol='AAPL', side='buy', type='market', time_in_force='day')
+    result = app.order_create_sync(model, gateway_request('/v2/orders', method='POST'))
 
     assert result == {'ok': True}
-    assert payloads['auth'] == "key"
+    assert payloads['auth'] == 'edge-key'
     assert payloads['submitted'] == {'symbol': 'AAPL'}
 
 
@@ -800,39 +848,39 @@ def test_parse_timeframe_errors():
         app.parse_timeframe("5Year")
 
 
-def test_alpaca_headers_requires_credentials(monkeypatch):
+def test_alpaca_credentials_present(monkeypatch):
 
-    monkeypatch.setattr(app, "API_KEY_ID", None)
-    monkeypatch.setattr(app, "API_SECRET_KEY", None)
+    monkeypatch.delenv("APCA_API_KEY_ID", raising=False)
+    monkeypatch.delenv("APCA_API_SECRET_KEY", raising=False)
+    assert app._alpaca_credentials_present() is False
+
+    monkeypatch.setenv("APCA_API_KEY_ID", "id")
+    monkeypatch.setenv("APCA_API_SECRET_KEY", "secret")
+    assert app._alpaca_credentials_present() is True
+
+
+
+def test_edge_http_client_auth_headers(monkeypatch):
+
     monkeypatch.delenv("APCA_API_KEY_ID", raising=False)
     monkeypatch.delenv("APCA_API_SECRET_KEY", raising=False)
 
-    with pytest.raises(HTTPException):
-        app._alpaca_headers()
+    client = edge_http.EdgeHttpClient("https://example.com")
+    with pytest.raises(HTTPException) as exc:
+        client._auth_headers()
+    assert exc.value.status_code == 503
 
-    monkeypatch.setattr(app, "API_KEY_ID", "key")
-    monkeypatch.setattr(app, "API_SECRET_KEY", "secret")
-    headers = app._alpaca_headers()
-    assert headers["APCA-API-KEY-ID"] == "key"
-
-    monkeypatch.setattr(app, "API_KEY_ID", None)
-    monkeypatch.setattr(app, "API_SECRET_KEY", None)
-
-    with pytest.raises(HTTPException):
-        app._alpaca_headers()
-
-    monkeypatch.setattr(app, "API_KEY_ID", "key")
-    monkeypatch.setattr(app, "API_SECRET_KEY", "secret")
-    headers = app._alpaca_headers()
-    assert headers["APCA-API-KEY-ID"] == "key"
+    monkeypatch.setenv("APCA_API_KEY_ID", "id")
+    monkeypatch.setenv("APCA_API_SECRET_KEY", "secret")
+    headers = client._auth_headers()
+    assert headers["APCA-API-KEY-ID"] == "id"
+    assert headers["APCA-API-SECRET-KEY"] == "secret"
 
 
 def test_require_gateway_key(monkeypatch):
 
     monkeypatch.delenv("EDGE_API_KEY", raising=False)
-    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
     monkeypatch.delenv("X_API_KEY", raising=False)
-
     monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
 
     with pytest.raises(HTTPException):
@@ -848,72 +896,61 @@ def test_require_gateway_key(monkeypatch):
 
     app._require_gateway_key(header_key="env-key")
 
-    monkeypatch.setattr(app, "EDGE_API_KEY", "override", raising=False)
+    monkeypatch.delenv("EDGE_API_KEY", raising=False)
+    monkeypatch.setenv("X_API_KEY", "override")
 
     with pytest.raises(HTTPException):
-        app._require_gateway_key(header_key="env-key")
+        app._require_gateway_key(header_key="edge-key")
 
     app._require_gateway_key(header_key="override")
 
 
 
-@pytest.mark.asyncio
-async def test_readyz_detail(monkeypatch):
+def test_readyz_detail(monkeypatch):
 
     monkeypatch.delenv("EDGE_API_KEY", raising=False)
-    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
-    monkeypatch.delenv("X_API_KEY", raising=False)
     monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
-    monkeypatch.setattr(app, "API_BASE_URL", "https://example", raising=False)
-    monkeypatch.setattr(app, "_get_http_client", lambda: object())
-    monkeypatch.setattr(app, "_alpaca_headers", lambda: {"APCA-API-KEY-ID": "id", "APCA-API-SECRET-KEY": "secret"})
+    monkeypatch.setenv("APCA_API_KEY_ID", "id")
+    monkeypatch.setenv("APCA_API_SECRET_KEY", "secret")
 
-    payload = await app.readyz(detail=True, x_api_key="edge-key")
-    assert payload["ready"] is True
-    assert payload["detail"]["http_client"] is True
-    assert payload["detail"]["alpaca_credentials"] is True
+    payload = extras.readyz(gateway_request('/readyz'))
+    assert payload['ok'] is True
+    assert payload['env']['alpaca_credentials'] is True
+    assert payload['env']['api_base_url']
+
+
+
+def test_readyz_reports_failures(monkeypatch):
+
+    monkeypatch.delenv("EDGE_API_KEY", raising=False)
+    monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
+    monkeypatch.delenv("APCA_API_KEY_ID", raising=False)
+    monkeypatch.delenv("APCA_API_SECRET_KEY", raising=False)
+    monkeypatch.setenv("APCA_API_BASE_URL", "")
+
+    payload = extras.readyz(gateway_request('/readyz'))
+    assert payload['ok'] is False
+    assert payload['env']['alpaca_credentials'] is False
 
 
 @pytest.mark.asyncio
-async def test_readyz_reports_failures(monkeypatch):
-
-    monkeypatch.delenv("EDGE_API_KEY", raising=False)
-    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
-    monkeypatch.delenv("X_API_KEY", raising=False)
-    monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
-
-    def fail_client():
-        raise HTTPException(status_code=500, detail="no client")
-
-    monkeypatch.setattr(app, "_get_http_client", fail_client)
-
-    def fail_headers():
-        raise HTTPException(status_code=500, detail="no creds")
-
-    monkeypatch.setattr(app, "_alpaca_headers", fail_headers)
-    monkeypatch.setattr(app, "API_BASE_URL", "", raising=False)
-
-    payload = await app.readyz(detail=False, x_api_key="edge-key")
-    assert payload["ready"] is False
-    assert set(payload["detail"]["failing"]) == {"http_client", "alpaca_credentials", "api_base_url"}
-
-
 @pytest.mark.asyncio
 async def test_account_activities_translates_unauthorized(monkeypatch):
 
     monkeypatch.delenv("EDGE_API_KEY", raising=False)
-    monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
     monkeypatch.delenv("X_API_KEY", raising=False)
     monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
 
-    async def fake_request_with_retry(client, method, path, headers=None, **kwargs):
+    async def fake_request_with_retry(client, method, path, **kwargs):
         assert kwargs.get("params") == {"direction": "desc"}
         return 401, {"Content-Type": "application/json"}, '{"message": "unauthorized"}'
 
     monkeypatch.setattr(app, "_get_http_client", lambda: object())
     monkeypatch.setattr(app, "_request_with_retry", fake_request_with_retry)
 
-    response = await app.account_activities(direction="desc", x_api_key="edge-key")
+    response = await app.account_activities(
+        gateway_request('/v2/account/activities'), direction="desc"
+    )
     assert isinstance(response, JSONResponse)
     assert response.status_code == 403
     assert json.loads(response.body.decode())["detail"].startswith("Activities not enabled")

@@ -29,7 +29,7 @@ function Invoke-EdgeServe {
         8000
     }
     Write-Host "Starting uvicorn on port $port..." -ForegroundColor Cyan
-    poetry run uvicorn app:app --reload --port $port
+    poetry run uvicorn edge.app:app --reload --port $port
 }
 
 switch ($Task.ToLowerInvariant()) {
