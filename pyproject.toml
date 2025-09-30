@@ -57,6 +57,7 @@ dev = [
     "mypy",
     "types-aiofiles",
     "types-requests",
+    "pytest-cov",
 ]
 
 [build-system]

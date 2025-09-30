@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from app import app
+from edge.app import app
 
 
 def main() -> None:

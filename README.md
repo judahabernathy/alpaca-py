@@ -46,6 +46,18 @@ You can find the documentation site here: https://alpaca.markets/sdks/python/get
 You can also find the API Reference of Alpaca APIs: https://docs.alpaca.markets/reference
 
 ## Installation <a name="installation"></a>
+### Windows Quickstart
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -U pip
+pip install -e ".[dev]"
+Copy-Item .env.example .env
+python -m pytest -q
+uvicorn edge.app:app --host 0.0.0.0 --port 8000
+```
+
 
 Alpaca-py is supported on Python 3.8+.  You can install Alpaca-py using pip.
 

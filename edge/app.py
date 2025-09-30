@@ -1,0 +1,843 @@
+import asyncio
+import json
+import os
+import re
+import time
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from textwrap import dedent
+from typing import Any, Dict, List, Optional, Union
+from uuid import uuid4
+
+import yaml
+from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.requests import (
+    StockBarsRequest,
+    StockLatestQuoteRequest,
+    StockQuotesRequest,
+    StockTradesRequest,
+)
+from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+from config import APCA_API_BASE_URL
+
+from .http import EdgeHttpClient
+from .logging import (
+    configure_logging,
+    log_duration,
+    log_error,
+    log_event,
+    reset_correlation_id,
+    set_correlation_id,
+)
+
+API_BASE_URL = APCA_API_BASE_URL
+API_KEY_ID = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY_ID")
+API_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_API_SECRET_KEY")
+EDGE_API_KEY = os.getenv("EDGE_API_KEY") or os.getenv("GATEWAY_API_KEY") or os.getenv("X_API_KEY")
+
+configure_logging()
+
+
+@asynccontextmanager
+async def _app_lifespan(application: FastAPI):
+    client = EdgeHttpClient(API_BASE_URL)
+    await client.startup()
+    application.state.http_client = client
+    log_event("startup_complete")
+    try:
+        yield
+    finally:
+        client_ref = getattr(application.state, "http_client", None)
+        if client_ref is not None:
+            await client_ref.shutdown()
+            application.state.http_client = None
+        log_event("shutdown_complete")
+
+
+app = FastAPI(title="Alpaca Wrapper", version="1.0.3", lifespan=_app_lifespan)
+
+
+@app.middleware("http")
+async def correlation_middleware(request: Request, call_next):
+    correlation_id = request.headers.get("X-Correlation-ID") or str(uuid4())
+    token = set_correlation_id(correlation_id)
+    start_time = time.perf_counter()
+    try:
+        log_event("incoming_request", method=request.method, path=str(request.url.path))
+        response = await call_next(request)
+        response.headers.setdefault("X-Correlation-ID", correlation_id)
+        log_duration("request_complete", start_time, status=response.status_code)
+        return response
+    finally:
+        reset_correlation_id(token)
+
+def evaluate_limit_guard(
+    *,
+    payload: Dict[str, Any],
+    extended_hours: bool,
+    time_in_force: str,
+    order_type: str,
+) -> Dict[str, Any]:
+    result: Dict[str, Any] = {"ok": True, "reason": None, "age": None, "drift": None, "debug": {}}
+    if (order_type or "").lower() != "limit":
+        return result
+
+    symbol = (payload.get("symbol") or "").upper()
+    limit_price = payload.get("limit_price")
+    side = (payload.get("side") or "").lower()
+
+    if not symbol or limit_price is None or side not in {"buy", "sell"}:
+        result["debug"] = {"skipped": "missing-order-context"}
+        return result
+
+    try:
+        ttl_seconds = float(os.getenv("ALPHA_QUOTE_TTL_SECONDS", "10"))
+    except ValueError:
+        ttl_seconds = 10.0
+
+    try:
+        drift_bps = float(os.getenv("ALPHA_MAX_DRIFT_BPS", "100"))
+    except ValueError:
+        drift_bps = 100.0
+
+    feed = os.getenv("ALPHA_QUOTE_FEED", "iex")
+    result["debug"] = {"feed": feed, "time_in_force": time_in_force, "extended_hours": bool(extended_hours)}
+
+    try:
+        client = md_client()
+        latest = client.get_stock_latest_quote(
+            StockLatestQuoteRequest(symbol_or_symbols=symbol, feed=feed)  # type: ignore[arg-type]
+        )
+        quote = latest.get(symbol) if isinstance(latest, dict) else None
+    except Exception as exc:
+        result["debug"]["quote_error"] = str(exc)
+        return result
+
+    if quote is None:
+        result["debug"]["quote_missing"] = True
+        return result
+
+    timestamp = getattr(quote, "timestamp", None)
+    if isinstance(timestamp, str):
+        try:
+            timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        except ValueError:
+            timestamp = None
+    if timestamp is None:
+        result["debug"]["timestamp_missing"] = True
+        return result
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    age = max((now - timestamp).total_seconds(), 0.0)
+    result["age"] = age
+    result["debug"]["quote_timestamp"] = timestamp.isoformat()
+    result["debug"]["ttl_seconds"] = ttl_seconds
+
+    if age > ttl_seconds:
+        result.update({"ok": False, "reason": "stale"})
+        return result
+
+    bid_price = getattr(quote, "bid_price", None)
+    ask_price = getattr(quote, "ask_price", None)
+    reference = ask_price if side == "buy" else bid_price
+    result["debug"].update({"bid_price": bid_price, "ask_price": ask_price})
+
+    if not reference or reference <= 0:
+        result["debug"]["reference_missing"] = reference
+        return result
+
+    try:
+        reference = float(reference)
+        limit_price_value = float(limit_price)
+    except (TypeError, ValueError):
+        result["debug"]["conversion_error"] = True
+        return result
+
+    drift = (limit_price_value - reference) / reference
+    result["drift"] = drift
+
+    max_drift = max(drift_bps, 0.0) / 10000.0
+    result["debug"]["max_drift"] = max_drift
+
+    if side == "buy" and drift > max_drift:
+        result.update({"ok": False, "reason": "drift"})
+        return result
+    if side == "sell" and (-drift) > max_drift:
+        result.update({"ok": False, "reason": "drift"})
+        return result
+
+    return result
+
+
+def _resolve_client_order_id(client_order_id: Optional[str]) -> str:
+    require = os.getenv("ALPHA_REQUIRE_CLIENT_ID") == "1"
+    if client_order_id:
+        return client_order_id
+    if require:
+        raise HTTPException(status_code=400, detail="client_order_id required")
+    return uuid4().hex
+
+
+def _enforce_ext_policy(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not os.getenv("ALPHA_ENFORCE_EXT"):
+        return payload
+
+    order_type = (payload.get("type") or "").lower()
+    tif = (payload.get("time_in_force") or "").lower()
+    extended_hours = bool(payload.get("extended_hours"))
+
+    if extended_hours:
+        if order_type != "limit":
+            raise HTTPException(status_code=400, detail="Extended hours orders must be limit orders")
+        if tif != "day":
+            raise HTTPException(status_code=400, detail="Extended hours limit orders must be DAY")
+        if payload.get("order_class"):
+            raise HTTPException(status_code=400, detail="Extended hours does not support advanced order classes")
+        if payload.get("limit_price") is None:
+            raise HTTPException(status_code=400, detail="Extended hours limit orders require limit_price")
+
+    if order_type == "limit" and payload.get("limit_price") is not None:
+        guard = evaluate_limit_guard(payload=payload, extended_hours=extended_hours,
+                                     time_in_force=tif, order_type=order_type)
+        if not guard.get("ok", True):
+            reason = (guard.get("reason") or "").lower()
+            if reason == "stale":
+                raise HTTPException(status_code=428, detail=guard)
+            if reason == "drift":
+                raise HTTPException(status_code=409, detail=guard)
+            raise HTTPException(status_code=400, detail=guard)
+
+    return payload
+
+
+def _max_retry_attempts() -> int:
+    try:
+        value = int(os.getenv("ALPHA_HTTP_MAX_RETRIES", "3"))
+    except ValueError:
+        value = 3
+    return max(1, value)
+
+
+def _retry_delay(retry_after: Optional[str]) -> float:
+    if not retry_after:
+        return 1.0
+    try:
+        return max(float(retry_after), 0.0)
+    except ValueError:
+        return 1.0
+
+
+
+async def _request_with_retry(
+    http_client: EdgeHttpClient, method: str, path: str, **kwargs: Any
+) -> tuple[int, Dict[str, str], str]:
+    attempts = 0
+    max_attempts = _max_retry_attempts()
+
+    while True:
+        status, headers, body = await http_client.request(
+            method,
+            path,
+            headers=_alpaca_headers(),
+            **kwargs,
+        )
+        if status != 429:
+            return status, headers, body
+
+        attempts += 1
+        if attempts >= max_attempts:
+            log_error("retry_exhausted", method=method, path=path, status=status)
+            raise HTTPException(status_code=429, detail=body or "rate limited")
+
+        await asyncio.sleep(_retry_delay(headers.get("Retry-After")))
+
+
+
+
+
+
+
+
+def _require_gateway_key(header_key: Optional[str], fallback_key: Optional[str] = None) -> None:
+    provided = header_key or fallback_key
+    if EDGE_API_KEY and provided != EDGE_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def _alpaca_headers():
+    key_id = API_KEY_ID or os.getenv("APCA_API_KEY_ID")
+    secret_key = API_SECRET_KEY or os.getenv("APCA_API_SECRET_KEY")
+    if not (key_id and secret_key):
+        raise HTTPException(status_code=500, detail="Upstream credentials not configured")
+    return {
+        "APCA-API-KEY-ID": key_id,
+        "APCA-API-SECRET-KEY": secret_key,
+    }
+
+def _get_http_client() -> EdgeHttpClient:
+    client = getattr(app.state, "http_client", None)
+    if client is None:
+        raise HTTPException(status_code=500, detail="HTTP client is unavailable")
+    return client
+
+
+def _decode_json(headers: Dict[str, str], body: str) -> Any:
+    content_type = headers.get("Content-Type", "")
+    if "application/json" in content_type.lower():
+        if not body:
+            return {}
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=502, detail="Invalid JSON from upstream") from exc
+    return body
+
+
+
+
+
+
+
+def md_client() -> StockHistoricalDataClient:
+    api_key = API_KEY_ID or os.getenv("APCA_API_KEY_ID")
+    secret_key = API_SECRET_KEY or os.getenv("APCA_API_SECRET_KEY")
+    kwargs: Dict[str, Any] = {}
+    if api_key and secret_key:
+        kwargs = {"api_key": api_key, "secret_key": secret_key}
+    return StockHistoricalDataClient(**kwargs)
+
+class CreateOrder(BaseModel):
+    symbol: str
+    side: str
+    qty: Optional[float] = None
+    notional: Optional[float] = None
+    type: str
+    time_in_force: str
+    limit_price: Optional[float] = None
+    stop_price: Optional[float] = None
+    order_class: Optional[str] = None
+    take_profit: Optional[Dict[str, Any]] = None
+    stop_loss: Optional[Dict[str, Any]] = None
+    extended_hours: Optional[bool] = None
+    trail_price: Optional[float] = None
+    trail_percent: Optional[float] = None
+    client_order_id: Optional[str] = None
+
+
+class WatchlistIn(BaseModel):
+    name: str
+    symbols: List[str]
+
+
+def _order_payload_from_model(order: Union[BaseModel, Dict[str, Any]]) -> Dict[str, Any]:
+    if isinstance(order, BaseModel):
+        return order.model_dump(exclude_none=True)
+    return {k: v for k, v in dict(order).items() if v is not None}
+
+
+def _prepare_order_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    normalised = dict(payload)
+    _enforce_ext_policy(normalised)
+    normalised["client_order_id"] = _resolve_client_order_id(normalised.get("client_order_id"))
+    return normalised
+
+
+async def _submit_order_async(payload: Dict[str, Any]) -> Dict[str, Any]:
+    prepared = _prepare_order_payload(payload)
+    status, headers, body = await _request_with_retry(
+        _get_http_client(),
+        "POST",
+        "/v2/orders",
+        json=prepared,
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body or "order rejected")
+    return _decode_json(headers, body)
+
+
+def _submit_order_sync(payload: Dict[str, Any]) -> Dict[str, Any]:
+    loop = asyncio.new_event_loop()
+    previous_loop = None
+    try:
+        try:
+            previous_loop = asyncio.get_event_loop()
+        except RuntimeError:
+            previous_loop = None
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(_submit_order_async(payload))
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        return result
+    finally:
+        asyncio.set_event_loop(previous_loop)
+        loop.close()
+
+def parse_timeframe(tf_str: str) -> TimeFrame:
+    m = re.match(r'^(\d+)([A-Za-z]+)$', tf_str)
+    if not m:
+        raise HTTPException(status_code=400, detail="Invalid timeframe format")
+    amount = int(m.group(1))
+    unit = m.group(2).lower()
+    units = {
+        "min": TimeFrameUnit.Minute,
+        "minute": TimeFrameUnit.Minute,
+        "hour": TimeFrameUnit.Hour,
+        "day": TimeFrameUnit.Day,
+        "week": TimeFrameUnit.Week,
+        "month": TimeFrameUnit.Month,
+    }
+    if unit not in units:
+        raise HTTPException(status_code=400, detail="Unsupported timeframe unit")
+    return TimeFrame(amount, units[unit])
+
+
+@app.get("/healthz")
+def healthz():
+    client_ready = isinstance(getattr(app.state, "http_client", None), EdgeHttpClient)
+    creds_ok = True
+    try:
+        _alpaca_headers()
+    except HTTPException:
+        creds_ok = False
+    dependencies = {
+        "http_client": client_ready,
+        "alpaca_credentials": creds_ok,
+        "api_base_url": bool(API_BASE_URL),
+    }
+    return {
+        "ok": all(dependencies.values()),
+        "dependencies": dependencies,
+    }
+
+
+# -- Orders
+@app.post("/v2/orders/sync")
+def order_create_sync(
+    order: CreateOrder,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None),
+):
+    """Synchronous helper that submits an order to Alpaca.
+
+    This endpoint mirrors `/v2/orders` but executes the request in the current
+    thread. Upstream rate limits propagate as HTTP 429 responses that include a
+    `Retry-After` header; clients must respect that delay before retrying. When
+    `extended_hours` is true the payload must represent a limit order with
+    `time_in_force="day"`, have a `limit_price`, and omit advanced
+    `order_class` values.
+    """
+    _require_gateway_key(x_api_key, api_key)
+    payload = _order_payload_from_model(order)
+    return _submit_order_sync(payload)
+
+
+@app.post("/v2/orders")
+async def order_create(
+    order: CreateOrder,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None),
+):
+    """Submit an order to Alpaca's `/v2/orders` endpoint.
+
+    All requests require an `X-API-Key` header (or `api_key` query parameter).
+    Alpaca may return HTTP 429 responses when rate limits are exceeded; the
+    response includes a `Retry-After` header which clients must honor before
+    retrying. When `extended_hours` is true, orders must be limit DAY orders,
+    provide `limit_price`, and omit advanced `order_class` values. Those
+    constraints are enforced before the request is forwarded upstream.
+    """
+    _require_gateway_key(x_api_key, api_key)
+    payload = _order_payload_from_model(order)
+    return await _submit_order_async(payload)
+
+
+@app.get("/v2/account")
+async def account_get(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None),
+):
+    _require_gateway_key(x_api_key, api_key)
+    status, headers, body = await _request_with_retry(_get_http_client(), "GET", "/v2/account")
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+    return _decode_json(headers, body)
+
+
+@app.get("/v2/orders")
+async def orders_list(
+    status: Optional[str] = Query(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    _require_gateway_key(x_api_key, api_key)
+    params = {"status": status} if status else None
+    status_code, headers, body = await _request_with_retry(
+        _get_http_client(),
+        "GET",
+        "/v2/orders",
+        params=params,
+    )
+    if status_code >= 400:
+        raise HTTPException(status_code=status_code, detail=body)
+    return _decode_json(headers, body)
+
+
+@app.get("/v2/orders/{order_id}")
+async def orders_get_by_id(
+    order_id: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    _require_gateway_key(x_api_key, api_key)
+    status, headers, body = await _request_with_retry(
+        _get_http_client(),
+        "GET",
+        f"/v2/orders/{order_id}",
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+    return _decode_json(headers, body)
+
+
+@app.get("/v2/positions")
+async def positions_list_v2(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    _require_gateway_key(x_api_key, api_key)
+    status, headers, body = await _request_with_retry(
+        _get_http_client(),
+        "GET",
+        "/v2/positions",
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+    return _decode_json(headers, body)
+
+
+@app.get("/v2/positions/{symbol}")
+async def positions_get(
+    symbol: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    _require_gateway_key(x_api_key, api_key)
+    status, headers, body = await _request_with_retry(
+        _get_http_client(),
+        "GET",
+        f"/v2/positions/{symbol}",
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+    return _decode_json(headers, body)
+
+
+@app.delete("/v2/positions")
+async def positions_close_all(
+    cancel_orders: bool = Query(False),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    _require_gateway_key(x_api_key, api_key)
+    params = {"cancel_orders": str(cancel_orders).lower()}
+    status, headers, body = await _request_with_retry(
+        _get_http_client(),
+        "DELETE",
+        "/v2/positions",
+        params=params,
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+    return _decode_json(headers, body)
+
+
+@app.delete("/v2/positions/{symbol}")
+async def positions_close(
+    symbol: str,
+    cancel_orders: bool = Query(False),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    _require_gateway_key(x_api_key, api_key)
+    params = {"cancel_orders": str(cancel_orders).lower()}
+    status, headers, body = await _request_with_retry(
+        _get_http_client(),
+        "DELETE",
+        f"/v2/positions/{symbol}",
+        params=params,
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+    return _decode_json(headers, body)
+
+
+async def _proxy_alpaca_request(
+    method: str,
+    path: str,
+    x_api_key: Optional[str],
+    payload: Optional[Dict[str, Any]] = None,
+    fallback_api_key: Optional[str] = None,
+):
+    _require_gateway_key(x_api_key, fallback_api_key)
+    status, headers, body = await _request_with_retry(
+        _get_http_client(),
+        method,
+        path,
+        json=payload,
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+
+    content_type = (headers.get("Content-Type") or "").lower()
+    if status == 204 or not body:
+        return Response(status_code=status)
+    if "application/json" in content_type:
+        data = _decode_json(headers, body)
+        if isinstance(data, (dict, list)):
+            return JSONResponse(status_code=status, content=data)
+    return Response(
+        status_code=status,
+        content=body,
+        media_type=headers.get("Content-Type") or "text/plain",
+    )
+
+
+@app.get("/v2/watchlists")
+async def watchlists_list_v2(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    return await _proxy_alpaca_request("GET", "/v2/watchlists", x_api_key, fallback_api_key=api_key)
+
+
+@app.post("/v2/watchlists")
+async def watchlists_create_v2(
+    watchlist: WatchlistIn,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    return await _proxy_alpaca_request(
+        "POST",
+        "/v2/watchlists",
+        x_api_key,
+        payload=watchlist.model_dump(),
+        fallback_api_key=api_key,
+    )
+
+
+
+@app.get("/v2/watchlists/{watchlist_id}")
+async def watchlists_get_v2(
+    watchlist_id: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    return await _proxy_alpaca_request(
+        "GET", f"/v2/watchlists/{watchlist_id}", x_api_key, fallback_api_key=api_key
+    )
+
+
+@app.put("/v2/watchlists/{watchlist_id}")
+async def watchlists_update_v2(
+    watchlist_id: str,
+    watchlist: WatchlistIn,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    return await _proxy_alpaca_request(
+        "PUT",
+        f"/v2/watchlists/{watchlist_id}",
+        x_api_key,
+        payload=watchlist.model_dump(),
+        fallback_api_key=api_key,
+    )
+
+
+@app.delete("/v2/watchlists/{watchlist_id}")
+async def watchlists_delete_v2(
+    watchlist_id: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+):
+    return await _proxy_alpaca_request(
+        "DELETE", f"/v2/watchlists/{watchlist_id}", x_api_key, fallback_api_key=api_key
+    )
+
+
+
+# -- Market Data
+@app.get("/v2/quotes")
+def get_quotes_v2(
+    symbol: str,
+    start: str,
+    end: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+) -> list[dict]:
+    _require_gateway_key(x_api_key, api_key)
+    req = StockQuotesRequest(
+        symbol_or_symbols=[symbol],
+        start=datetime.fromisoformat(start),
+        end=datetime.fromisoformat(end),
+    )
+    quotes = md_client().get_stock_quotes(req)
+    quotes_df = getattr(quotes, "df", None)
+    if quotes_df is None:
+        raise HTTPException(status_code=502, detail="Quotes response missing dataframe")
+    return quotes_df.reset_index().to_dict(orient="records")
+
+
+@app.get("/v2/trades")
+def get_trades_v2(
+    symbol: str,
+    start: str,
+    end: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+) -> list[dict]:
+    _require_gateway_key(x_api_key, api_key)
+    req = StockTradesRequest(
+        symbol_or_symbols=[symbol],
+        start=datetime.fromisoformat(start),
+        end=datetime.fromisoformat(end),
+    )
+    trades = md_client().get_stock_trades(req)
+    trades_df = getattr(trades, "df", None)
+    if trades_df is None:
+        raise HTTPException(status_code=502, detail="Trades response missing dataframe")
+    return trades_df.reset_index().to_dict(orient="records")
+
+
+@app.get("/v2/bars")
+def get_bars_v2(
+    symbol: str,
+    timeframe: str = Query("1Day"),
+    start: str = Query(...),
+    end: Optional[str] = None,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, alias="api_key"),
+) -> list[dict]:
+    _require_gateway_key(x_api_key, api_key)
+    tf = parse_timeframe(timeframe)
+    req = StockBarsRequest(
+        symbol_or_symbols=[symbol],
+        timeframe=tf,
+        start=datetime.fromisoformat(start),
+        end=datetime.fromisoformat(end) if end else None,
+    )
+    bars = md_client().get_stock_bars(req)
+    bars_df = getattr(bars, "df", None)
+    if bars_df is None:
+        raise HTTPException(status_code=502, detail="Bars response missing dataframe")
+    return bars_df.reset_index().to_dict(orient="records")
+
+
+
+
+# --- ChatGPT plugin support ---
+
+try:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://chat.openai.com"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+except Exception:
+    pass
+
+try:
+    app.mount("/.well-known", StaticFiles(directory=".well-known"), name="wellknown")
+except Exception:
+    pass
+
+# --- GPT Actions OpenAPI patch ---
+
+SERVER_URL = 'https://alpaca-py-production.up.railway.app'
+
+def _custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    schema = get_openapi(
+        title="Alpaca Wrapper",
+        version="1.0.0",
+        routes=app.routes,
+    )
+    # Force OpenAPI 3.1 and a proper base URL for GPT Actions
+    schema["openapi"] = "3.1.0"
+    schema["servers"] = [{"url": SERVER_URL}]
+
+    components = schema.setdefault("components", {})
+    security_schemes = components.setdefault("securitySchemes", {})
+    security_schemes["EdgeApiKey"] = {"type": "apiKey", "in": "header", "name": "X-API-Key"}
+    security_schemes["EdgeApiKeyQuery"] = {"type": "apiKey", "in": "query", "name": "api_key"}
+    schema["security"] = [{"EdgeApiKey": []}, {"EdgeApiKeyQuery": []}]
+
+    info = schema.setdefault("info", {})
+    info["description"] = dedent(
+        """
+        All endpoints require the `X-API-Key` header; the `api_key` query parameter is
+        supported as a compatibility fallback. The service propagates Alpaca's rate
+        limits as HTTP 429 responses and surfaces the upstream `Retry-After` header.
+        When `extended_hours` is enabled the order payload must remain a DAY limit
+        order, include `limit_price`, and omit advanced `order_class` values.
+        """
+    ).strip()
+
+    app.openapi_schema = schema
+    return app.openapi_schema
+
+
+app.openapi = _custom_openapi  # type: ignore[method-assign]
+
+SPEC_JSON_PATH = (Path(__file__).resolve().parent / ".well-known" / "openapi.json")
+SPEC_YAML_PATH = SPEC_JSON_PATH.with_suffix(".yaml")
+
+
+def _serve_spec_file(path: Path, media_type: str):
+    if path.exists():
+        return FileResponse(path, media_type=media_type)
+    spec = app.openapi()
+    if media_type == "application/json":
+        return JSONResponse(spec)
+    return PlainTextResponse(
+        yaml.safe_dump(spec, sort_keys=False, allow_unicode=True),
+        media_type=media_type,
+    )
+
+
+@app.get("/.well-known/openapi.json", include_in_schema=False)
+def well_known_openapi_json():
+    return _serve_spec_file(SPEC_JSON_PATH, "application/json")
+
+
+@app.get("/.well-known/openapi.yaml", include_in_schema=False)
+def well_known_openapi_yaml():
+    return _serve_spec_file(SPEC_YAML_PATH, "application/yaml")
+
+
+@app.get("/openapi.json", include_in_schema=False)
+def openapi_json_alias():
+    return _serve_spec_file(SPEC_JSON_PATH, "application/json")
+
+
+@app.get("/openapi.yaml", include_in_schema=False)
+def openapi_yaml_alias():
+    return _serve_spec_file(SPEC_YAML_PATH, "application/yaml")
+
+
+# --- end patch ---
+
+
+

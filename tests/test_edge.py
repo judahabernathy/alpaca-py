@@ -1,12 +1,177 @@
 import importlib
 import json
 import os
-from datetime import datetime, timezone, timedelta
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 import pytest
 from fastapi import HTTPException
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+
+import edge.app as app
+import edge.http as edge_http
+import edge.logging as edge_logging
+
+
+def test_legacy_app_module_reexports_edge_helpers():
+    legacy = importlib.import_module("app")
+
+    assert legacy.app is app.app
+    assert legacy.EdgeHttpClient is app.EdgeHttpClient
+    assert legacy._request_with_retry is app._request_with_retry
+
+
+@pytest.mark.asyncio
+async def test_lifespan_manages_http_client(monkeypatch):
+    events = []
+
+    class FakeClient:
+        def __init__(self, base_url: str) -> None:
+            events.append(("init", base_url))
+
+        async def startup(self) -> None:
+            events.append(("startup",))
+
+        async def shutdown(self) -> None:
+            events.append(("shutdown",))
+
+    monkeypatch.setattr(app, "EdgeHttpClient", FakeClient)
+    application = app.app
+
+    async with app._app_lifespan(application):
+        assert isinstance(application.state.http_client, FakeClient)
+
+    assert application.state.http_client is None
+    assert events == [("init", app.API_BASE_URL), ("startup",), ("shutdown",)]
+
+
+def test_get_http_client_requires_startup(monkeypatch):
+    monkeypatch.setattr(app.app.state, "http_client", None, raising=False)
+
+    with pytest.raises(HTTPException) as excinfo:
+        app._get_http_client()
+
+    assert excinfo.value.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_edge_http_client_request_injects_correlation(monkeypatch):
+    recorded = {}
+    logged = []
+
+    class FakeResponse:
+        status = 201
+        headers = {"Content-Type": "application/json"}
+
+        async def text(self) -> str:
+            return '{"ok": true}'
+
+        async def release(self) -> None:
+            recorded["released"] = True
+
+    class FakeSession:
+        def __init__(self, timeout=None) -> None:
+            recorded["timeout"] = timeout
+
+        async def request(self, method, url, headers=None, **kwargs):
+            recorded["request"] = (method, url, headers, kwargs)
+            return FakeResponse()
+
+        async def close(self) -> None:
+            recorded["closed"] = True
+
+    monkeypatch.setattr(edge_http.aiohttp, "ClientSession", FakeSession)
+    monkeypatch.setattr(edge_http, "log_request", lambda method, url, status, latency_s, **fields: logged.append((method, url, status)))
+    monkeypatch.setattr(edge_http, "log_error", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("log_error should not be called")))
+    monkeypatch.setattr(edge_http, "get_correlation_id", lambda: "cid-123")
+
+    client = edge_http.EdgeHttpClient("https://service")
+    await client.startup()
+
+    status, headers, body = await client.request("get", "/resource", headers={"X-Test": "1"})
+
+    assert status == 201
+    assert body == '{"ok": true}'
+    assert headers["Content-Type"] == "application/json"
+
+    method, url, logged_status = logged[0]
+    assert method == "GET"
+    assert url == "https://service/resource"
+    assert logged_status == 201
+
+    method_called, url_called, sent_headers, kwargs = recorded["request"]
+    assert method_called == "GET"
+    assert url_called == "https://service/resource"
+    assert sent_headers["X-Correlation-ID"] == "cid-123"
+    assert sent_headers["X-Test"] == "1"
+    assert kwargs == {}
+
+    await client.shutdown()
+
+    assert recorded.get("closed") is True
+    assert recorded.get("released") is True
+
+
+@pytest.mark.asyncio
+async def test_edge_http_client_logs_errors(monkeypatch):
+    errors = []
+
+    class BoomSession:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        async def request(self, *args, **kwargs):
+            raise RuntimeError("boom")
+
+        async def close(self) -> None:
+            errors.append("closed")
+
+    monkeypatch.setattr(edge_http.aiohttp, "ClientSession", lambda timeout=None: BoomSession())
+    monkeypatch.setattr(edge_http, "log_request", lambda *args, **kwargs: None)
+    monkeypatch.setattr(edge_http, "log_error", lambda event, **fields: errors.append((event, fields)))
+    monkeypatch.setattr(edge_http, "get_correlation_id", lambda: None)
+
+    client = edge_http.EdgeHttpClient("https://service")
+    await client.startup()
+
+    with pytest.raises(RuntimeError):
+        await client.request("get", "/resource")
+
+    await client.shutdown()
+
+    assert errors[0][0] == "http_error"
+
+
+def test_logging_helpers_emit_structured_payloads(caplog):
+    app.configure_logging()
+    caplog.set_level("INFO")
+
+    token = app.set_correlation_id("cid-test")
+    try:
+        app.log_event("test_event", foo="bar")
+        app.log_error("test_error", meaning=42)
+        start = time.perf_counter() - 0.01
+        app.log_duration("timed", start, extra="value")
+        edge_logging.log_request("GET", "https://example.test", 200, 0.123, path="/")
+    finally:
+        app.reset_correlation_id(token)
+
+    messages = [json.loads(record.message) for record in caplog.records]
+
+    assert messages[0]["event"] == "test_event"
+    assert messages[0]["foo"] == "bar"
+    assert messages[0]["correlation_id"] == "cid-test"
+
+    assert messages[1]["event"] == "test_error"
+    assert messages[1]["meaning"] == 42
+
+    assert messages[2]["event"] == "timed"
+    assert "latency_ms" in messages[2]
+
+    assert messages[3]["event"] == "http_request"
+    assert messages[3]["method"] == "GET"
+    assert messages[3]["status"] == 200
 
 
 def reload_config_with_env(env: Dict[str, str]) -> Any:
@@ -41,7 +206,6 @@ def test_alias_env_unifies_bases():
 
 def test_ext_requires_limit_day_and_forbids_bracket(monkeypatch):
     os.environ["ALPHA_ENFORCE_EXT"] = "1"
-    import app
 
     payload = {
         "symbol": "AAPL",
@@ -84,7 +248,6 @@ def test_ext_requires_limit_day_and_forbids_bracket(monkeypatch):
 
 def test_ttl_and_drift_gates(monkeypatch):
     os.environ["ALPHA_ENFORCE_EXT"] = "1"
-    import app
 
     def fake_eval_stale(**_: Any) -> Dict[str, Any]:
         return {"ok": False, "reason": "stale", "age": 99, "drift": None, "debug": {}}
@@ -125,33 +288,20 @@ def test_ttl_and_drift_gates(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_request_with_retry_bubbles_429(monkeypatch):
-    import app
+    class FakeHttpClient:
+        async def request(self, method: str, path: str, headers=None, **kwargs: Any):
+            return 429, {"Retry-After": "2"}, "rate limited"
 
-    class FakeResponse:
-        def __init__(self, status: int, headers: Dict[str, str], body: str) -> None:
-            self.status = status
-            self.headers = headers
-            self._body = body
-
-        async def text(self) -> str:
-            return self._body
-
-        async def release(self) -> None:
-            return None
-
-    class FakeSession:
-        async def request(self, method: str, url: str, **_: Any) -> FakeResponse:
-            return FakeResponse(429, {"Retry-After": "2"}, "rate limited")
+    monkeypatch.setattr(app, "_alpaca_headers", lambda: {})
 
     with pytest.raises(HTTPException) as excinfo:
-        await app._request_with_retry(FakeSession(), "GET", "http://example.test")
+        await app._request_with_retry(FakeHttpClient(), "GET", "/example")
 
     assert excinfo.value.status_code == 429
     assert "rate limited" in str(excinfo.value.detail).lower()
 
 
 def test_uuid_fallback_when_not_required():
-    import app
 
     os.environ.pop("ALPHA_REQUIRE_CLIENT_ID", None)
     client_id = app._resolve_client_order_id(None)
@@ -159,7 +309,6 @@ def test_uuid_fallback_when_not_required():
 
 
 def test_require_client_id_when_flag_set():
-    import app
 
     os.environ["ALPHA_REQUIRE_CLIENT_ID"] = "1"
     with pytest.raises(HTTPException) as excinfo:
@@ -170,7 +319,6 @@ def test_require_client_id_when_flag_set():
 
 
 def test_client_id_passthrough_without_requirement():
-    import app
 
     os.environ.pop("ALPHA_REQUIRE_CLIENT_ID", None)
     assert app._resolve_client_order_id("custom-123") == "custom-123"
@@ -178,7 +326,6 @@ def test_client_id_passthrough_without_requirement():
 
 
 def test_client_id_passthrough_with_requirement(monkeypatch):
-    import app
 
     monkeypatch.setenv("ALPHA_REQUIRE_CLIENT_ID", "1")
     assert app._resolve_client_order_id("user-provided") == "user-provided"
@@ -186,7 +333,6 @@ def test_client_id_passthrough_with_requirement(monkeypatch):
 
 
 def test_evaluate_limit_guard_marks_stale(monkeypatch):
-    import app
 
     symbol = "AAPL"
     stale_timestamp = datetime.now(timezone.utc) - timedelta(seconds=30)
@@ -217,7 +363,6 @@ def test_evaluate_limit_guard_marks_stale(monkeypatch):
 
 
 def test_evaluate_limit_guard_marks_drift(monkeypatch):
-    import app
 
     symbol = "TSLA"
     fresh_timestamp = datetime.now(timezone.utc)
@@ -249,7 +394,6 @@ def test_evaluate_limit_guard_marks_drift(monkeypatch):
 
 
 def test_enforce_ext_policy_rejects_advanced_order_class(monkeypatch):
-    import app
 
     monkeypatch.setenv("ALPHA_ENFORCE_EXT", "1")
     payload = {
@@ -269,37 +413,24 @@ def test_enforce_ext_policy_rejects_advanced_order_class(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_request_with_retry_default_delay(monkeypatch):
-    import app
-
-    class FakeResponse:
-        def __init__(self, attempt: int):
-            self.status = 429
-            self.headers = {"Retry-After": "not-a-number"}
-            self._body = f"rate limited {attempt}"
-
-        async def text(self):
-            return self._body
-
-        async def release(self):
-            return None
-
-    class FakeSession:
+    class FakeHttpClient:
         def __init__(self):
             self.attempts = 0
 
-        async def request(self, method, url, **kwargs):
+        async def request(self, method, path, headers=None, **kwargs):
             self.attempts += 1
-            return FakeResponse(self.attempts)
+            return 429, {}, f"rate limited {self.attempts}"
 
-    sleeps = []
+    sleeps: list[float] = []
 
     async def fake_sleep(delay):
         sleeps.append(delay)
 
+    monkeypatch.setattr(app, "_alpaca_headers", lambda: {})
     monkeypatch.setattr(app.asyncio, "sleep", fake_sleep)
 
     with pytest.raises(HTTPException) as excinfo:
-        await app._request_with_retry(FakeSession(), "GET", "http://example.test")
+        await app._request_with_retry(FakeHttpClient(), "GET", "/example")
 
     assert excinfo.value.status_code == 429
     assert sleeps == [1.0, 1.0]
@@ -307,113 +438,58 @@ async def test_request_with_retry_default_delay(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_request_with_retry_honors_max_attempts(monkeypatch):
-    import app
-
     monkeypatch.setenv("ALPHA_HTTP_MAX_RETRIES", "2")
 
-    class FakeResponse:
-        def __init__(self):
-            self.status = 429
-            self.headers = {"Retry-After": "1"}
-            self._body = "rate limited"
-
-        async def text(self):
-            return self._body
-
-        async def release(self):
-            return None
-
-    class FakeSession:
+    class FakeHttpClient:
         def __init__(self):
             self.calls = 0
 
-        async def request(self, method, url, **kwargs):
+        async def request(self, method, path, headers=None, **kwargs):
             self.calls += 1
-            return FakeResponse()
+            return 429, {"Retry-After": "1"}, "rate limited"
 
-    session = FakeSession()
+    client = FakeHttpClient()
+    monkeypatch.setattr(app, "_alpaca_headers", lambda: {})
 
     with pytest.raises(HTTPException) as excinfo:
-        await app._request_with_retry(session, "GET", "http://example.test")
+        await app._request_with_retry(client, "GET", "/example")
 
     assert excinfo.value.status_code == 429
-    assert session.calls == 2
+    assert client.calls == 2
 
 
 @pytest.mark.asyncio
 async def test_gateway_routes_and_market_data(monkeypatch):
-    import app
     from types import SimpleNamespace
 
-    class FakeResponse:
-        def __init__(self, status=200, json_data=None, text=None, headers=None):
-            self.status = status
-            self._json = json_data if json_data is not None else {}
-            self._text = text if text is not None else json.dumps(self._json)
-            self.headers = headers or {}
-
-        async def text(self):
-            return self._text
-
-        async def json(self):
-            return self._json
-
-        async def release(self):
-            return None
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    class FakeSession:
+    class FakeHttpClient:
         def __init__(self, responses):
             self._responses = responses
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def _pop(self, method, url):
-            expected_method, expected_url, response = self._responses.pop(0)
+        async def request(self, method, path, headers=None, **kwargs):
+            expected_method, expected_path, status, content_type, body = self._responses.pop(0)
             assert expected_method == method
-            assert expected_url == url
-            return response
+            assert expected_path == path
+            return status, {"Content-Type": content_type}, body
 
-        def get(self, url, **kwargs):
-            return self._pop("GET", url)
-
-        def post(self, url, **kwargs):
-            return self._pop("POST", url)
-
-        def delete(self, url, **kwargs):
-            return self._pop("DELETE", url)
-
-        def request(self, method, url, **kwargs):
-            return self._pop(method.upper(), url)
-
-    base = app.API_BASE_URL
     responses = [
-        ("GET", f"{base}/v2/account", FakeResponse(json_data={"id": "acct"})),
-        ("GET", f"{base}/v2/orders", FakeResponse(json_data=[{"id": "order"}])),
-        ("GET", f"{base}/v2/orders/abc", FakeResponse(json_data={"id": "abc"})),
-        ("GET", f"{base}/v2/positions", FakeResponse(json_data=[])),
-        ("GET", f"{base}/v2/positions/AAPL", FakeResponse(json_data={"symbol": "AAPL"})),
-        ("DELETE", f"{base}/v2/positions", FakeResponse(json_data={"status": "all-closed"})),
-        ("DELETE", f"{base}/v2/positions/AAPL", FakeResponse(json_data={"status": "closed"})),
-        ("GET", f"{base}/v2/watchlists", FakeResponse(json_data=[])),
-        ("POST", f"{base}/v2/watchlists", FakeResponse(json_data={"id": "wl"})),
-        ("GET", f"{base}/v2/watchlists/wl", FakeResponse(json_data={"id": "wl"})),
-        ("PUT", f"{base}/v2/watchlists/wl", FakeResponse(json_data={"id": "wl", "symbols": ["AAPL"]})),
-        ("DELETE", f"{base}/v2/watchlists/wl", FakeResponse(status=204, text="")),
+        ("GET", "/v2/account", 200, "application/json", json.dumps({"id": "acct"})),
+        ("GET", "/v2/orders", 200, "application/json", json.dumps([{ "id": "order" }])),
+        ("GET", "/v2/orders/abc", 200, "application/json", json.dumps({"id": "abc"})),
+        ("GET", "/v2/positions", 200, "application/json", json.dumps([])),
+        ("GET", "/v2/positions/AAPL", 200, "application/json", json.dumps({"symbol": "AAPL"})),
+        ("DELETE", "/v2/positions", 200, "application/json", json.dumps({"status": "all-closed"})),
+        ("DELETE", "/v2/positions/AAPL", 200, "application/json", json.dumps({"status": "closed"})),
+        ("GET", "/v2/watchlists", 200, "application/json", json.dumps([])),
+        ("POST", "/v2/watchlists", 200, "application/json", json.dumps({"id": "wl"})),
+        ("GET", "/v2/watchlists/wl", 200, "application/json", json.dumps({"id": "wl"})),
+        ("PUT", "/v2/watchlists/wl", 200, "application/json", json.dumps({"id": "wl", "symbols": ["AAPL"]})),
+        ("DELETE", "/v2/watchlists/wl", 204, "text/plain", ""),
     ]
 
-    session_factory = lambda **kwargs: FakeSession(responses)
-    monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
-    monkeypatch.setattr(app, "aiohttp", SimpleNamespace(ClientSession=session_factory))
+    fake_client = FakeHttpClient(responses)
+    monkeypatch.setattr(app, "_get_http_client", lambda: fake_client)
+    monkeypatch.setenv("EDGE_API_KEY", "edge-key")
 
     account = await app.account_get(x_api_key="edge-key")
     assert account == {"id": "acct"}
@@ -466,12 +542,10 @@ async def test_gateway_routes_and_market_data(monkeypatch):
     assert quotes[0]["symbol"] == "AAPL"
     assert trades[0]["trade"] == 1
     assert bars[0]["bar"] == 1
-    assert responses == []
-
+    assert fake_client._responses == []
 
 @pytest.mark.asyncio
 async def test_spec_serving(monkeypatch, tmp_path):
-    import app
 
     path_json = tmp_path / "openapi.json"
     path_json.write_text('{"openapi": "3.1.0"}')
@@ -498,7 +572,6 @@ async def test_spec_serving(monkeypatch, tmp_path):
     assert app.openapi_yaml_alias().media_type == "application/yaml"
 
 def test_evaluate_limit_guard_missing_context():
-    import app
 
     result = app.evaluate_limit_guard(
         payload={"limit_price": None, "side": "buy"},
@@ -511,7 +584,6 @@ def test_evaluate_limit_guard_missing_context():
 
 
 def test_evaluate_limit_guard_quote_error(monkeypatch):
-    import app
 
     class RaisingClient:
         def get_stock_latest_quote(self, request):
@@ -530,7 +602,6 @@ def test_evaluate_limit_guard_quote_error(monkeypatch):
 
 
 def test_evaluate_limit_guard_quote_missing(monkeypatch):
-    import app
 
     class FakeClient:
         def get_stock_latest_quote(self, request):
@@ -549,7 +620,6 @@ def test_evaluate_limit_guard_quote_missing(monkeypatch):
 
 
 def test_evaluate_limit_guard_timestamp_missing(monkeypatch):
-    import app
 
     class FakeQuote:
         timestamp = None
@@ -573,7 +643,6 @@ def test_evaluate_limit_guard_timestamp_missing(monkeypatch):
 
 
 def test_evaluate_limit_guard_reference_missing(monkeypatch):
-    import app
     from datetime import datetime, timezone
 
     class FakeQuote:
@@ -598,7 +667,6 @@ def test_evaluate_limit_guard_reference_missing(monkeypatch):
 
 
 def test_evaluate_limit_guard_conversion_error(monkeypatch):
-    import app
     from datetime import datetime, timezone
 
     class FakeQuote:
@@ -623,7 +691,6 @@ def test_evaluate_limit_guard_conversion_error(monkeypatch):
 
 
 def test_order_payload_from_model_variants():
-    import app
 
     model = app.CreateOrder(symbol="AAPL", side="buy", type="market", time_in_force="day")
     model_payload = app._order_payload_from_model(model)
@@ -634,7 +701,6 @@ def test_order_payload_from_model_variants():
 
 
 def test_prepare_order_payload_inserts_id(monkeypatch):
-    import app
 
     monkeypatch.setattr(app, "_enforce_ext_policy", lambda payload: payload)
     monkeypatch.setattr(app, "_resolve_client_order_id", lambda cid: cid or "generated")
@@ -647,33 +713,13 @@ def test_prepare_order_payload_inserts_id(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_submit_order_async_success(monkeypatch):
-    import app
-
-    class FakeResponse:
-        status = 200
-
-        async def json(self):
-            return {"ok": True}
-
-        async def text(self):
-            return json.dumps({"ok": True})
-
-        async def release(self):
-            return None
-
-    async def fake_request(session, method, url, **kwargs):
-        return FakeResponse()
-
-    class DummySession:
-        async def __aenter__(self):
-            return object()
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
     monkeypatch.setattr(app, "_prepare_order_payload", lambda payload: payload)
+
+    async def fake_request(client, method, path, **kwargs):
+        return 200, {"Content-Type": "application/json"}, json.dumps({"ok": True})
+
     monkeypatch.setattr(app, "_request_with_retry", fake_request)
-    monkeypatch.setattr(app.aiohttp, "ClientSession", lambda **kwargs: DummySession())
+    monkeypatch.setattr(app, "_get_http_client", lambda: object())
 
     result = await app._submit_order_async({"symbol": "AAPL"})
     assert result["ok"] is True
@@ -681,31 +727,13 @@ async def test_submit_order_async_success(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_submit_order_async_error(monkeypatch):
-    import app
-
-    class FakeResponse:
-        def __init__(self):
-            self.status = 500
-
-        async def text(self):
-            return "boom"
-
-        async def release(self):
-            return None
-
-    async def fake_request(session, method, url, **kwargs):
-        return FakeResponse()
-
-    class DummySession:
-        async def __aenter__(self):
-            return object()
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
     monkeypatch.setattr(app, "_prepare_order_payload", lambda payload: payload)
+
+    async def fake_request(client, method, path, **kwargs):
+        return 500, {"Content-Type": "text/plain"}, "boom"
+
     monkeypatch.setattr(app, "_request_with_retry", fake_request)
-    monkeypatch.setattr(app.aiohttp, "ClientSession", lambda **kwargs: DummySession())
+    monkeypatch.setattr(app, "_get_http_client", lambda: object())
 
     with pytest.raises(HTTPException) as excinfo:
         await app._submit_order_async({"symbol": "AAPL"})
@@ -714,43 +742,20 @@ async def test_submit_order_async_error(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_submit_order_async_fallback_to_text(monkeypatch):
-    import app
-    from aiohttp import ContentTypeError
-
-    class FakeResponse:
-        status = 200
-
-        async def json(self):
-            raise ContentTypeError(request_info=None, history=None, message="no-json")
-
-        async def text(self):
-            return json.dumps({"fallback": True})
-
-        async def release(self):
-            return None
-
-    async def fake_request(session, method, url, **kwargs):
-        return FakeResponse()
-
-    class DummySession:
-        async def __aenter__(self):
-            return object()
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
+async def test_submit_order_async_invalid_json(monkeypatch):
     monkeypatch.setattr(app, "_prepare_order_payload", lambda payload: payload)
-    monkeypatch.setattr(app, "_request_with_retry", fake_request)
-    monkeypatch.setattr(app.aiohttp, "ClientSession", lambda **kwargs: DummySession())
 
-    result = await app._submit_order_async({"symbol": "AAPL"})
-    assert result["fallback"] is True
+    async def fake_request(client, method, path, **kwargs):
+        return 200, {"Content-Type": "application/json"}, "not json"
+
+    monkeypatch.setattr(app, "_request_with_retry", fake_request)
+    monkeypatch.setattr(app, "_get_http_client", lambda: object())
+
+    with pytest.raises(HTTPException):
+        await app._submit_order_async({"symbol": "AAPL"})
 
 
 def test_submit_order_sync_uses_event_loop(monkeypatch):
-    import app
-
     async def fake_async(payload):
         return {"ok": True}
 
@@ -761,7 +766,6 @@ def test_submit_order_sync_uses_event_loop(monkeypatch):
 
 
 def test_parse_timeframe_errors():
-    import app
 
     with pytest.raises(HTTPException):
         app.parse_timeframe("bad")
@@ -771,7 +775,6 @@ def test_parse_timeframe_errors():
 
 
 def test_alpaca_headers_requires_credentials(monkeypatch):
-    import app
 
     monkeypatch.setattr(app, "API_KEY_ID", None)
     monkeypatch.setattr(app, "API_SECRET_KEY", None)
@@ -799,7 +802,6 @@ def test_alpaca_headers_requires_credentials(monkeypatch):
 
 
 def test_require_gateway_key(monkeypatch):
-    import app
 
     monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
 
@@ -807,3 +809,8 @@ def test_require_gateway_key(monkeypatch):
         app._require_gateway_key(header_key="wrong")
 
     app._require_gateway_key(header_key="edge-key")
+
+
+
+
+
