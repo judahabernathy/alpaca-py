@@ -25,25 +25,9 @@
     "/v2/orders/sync": {
       "post": {
         "summary": "Order Create Sync",
-        "description": "Synchronous helper that submits an order to Alpaca.\n\nThis endpoint mirrors `/v2/orders` but executes the request in the current\nthread. Upstream rate limits propagate as HTTP 429 responses that include a\n`Retry-After` header; clients must respect that delay before retrying. When\n`extended_hours` is true the payload must represent a limit order with\n`time_in_force=\"day\"`, have a `limit_price`, and omit advanced\n`order_class` values.",
+        "description": "Synchronously mirror `/v2/orders` in the current thread.\n\nApplies the limit guard (extended-hours must be DAY limit orders)\nand surfaces upstream HTTP 429 responses with their `Retry-After`.",
         "operationId": "order_create_sync_v2_orders_sync_post",
         "parameters": [
-          {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
           {
             "name": "X-API-Key",
             "in": "header",
@@ -96,25 +80,9 @@
     "/v2/orders": {
       "post": {
         "summary": "Order Create",
-        "description": "Submit an order to Alpaca's `/v2/orders` endpoint.\n\nAll requests require an `X-API-Key` header (or `api_key` query parameter).\nAlpaca may return HTTP 429 responses when rate limits are exceeded; the\nresponse includes a `Retry-After` header which clients must honor before\nretrying. When `extended_hours` is true, orders must be limit DAY orders,\nprovide `limit_price`, and omit advanced `order_class` values. Those\nconstraints are enforced before the request is forwarded upstream.",
+        "description": "Submit an order via Alpaca's `/v2/orders`. \n\nRequires `X-API-Key`, forwards 429 responses with `Retry-After`, and\napplies the limit guard (extended-hours must be DAY limit orders).",
         "operationId": "order_create_v2_orders_post",
         "parameters": [
-          {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
           {
             "name": "X-API-Key",
             "in": "header",
@@ -184,22 +152,6 @@
             }
           },
           {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
-          {
             "name": "X-API-Key",
             "in": "header",
             "required": false,
@@ -243,22 +195,6 @@
         "summary": "Account Get",
         "operationId": "account_get_v2_account_get",
         "parameters": [
-          {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
           {
             "name": "X-API-Key",
             "in": "header",
@@ -313,22 +249,6 @@
             }
           },
           {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
-          {
             "name": "X-API-Key",
             "in": "header",
             "required": false,
@@ -372,22 +292,6 @@
         "summary": "Positions List V2",
         "operationId": "positions_list_v2_v2_positions_get",
         "parameters": [
-          {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
           {
             "name": "X-API-Key",
             "in": "header",
@@ -441,22 +345,6 @@
             }
           },
           {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
-          {
             "name": "X-API-Key",
             "in": "header",
             "required": false,
@@ -507,22 +395,6 @@
             "schema": {
               "type": "string",
               "title": "Symbol"
-            }
-          },
-          {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
             }
           },
           {
@@ -587,22 +459,6 @@
             }
           },
           {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
-          {
             "name": "X-API-Key",
             "in": "header",
             "required": false,
@@ -647,22 +503,6 @@
         "operationId": "watchlists_list_v2_v2_watchlists_get",
         "parameters": [
           {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
-          {
             "name": "X-API-Key",
             "in": "header",
             "required": false,
@@ -704,22 +544,6 @@
         "summary": "Watchlists Create V2",
         "operationId": "watchlists_create_v2_v2_watchlists_post",
         "parameters": [
-          {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
           {
             "name": "X-API-Key",
             "in": "header",
@@ -784,22 +608,6 @@
             }
           },
           {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
-          {
             "name": "X-API-Key",
             "in": "header",
             "required": false,
@@ -848,22 +656,6 @@
             "schema": {
               "type": "string",
               "title": "Watchlist Id"
-            }
-          },
-          {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
             }
           },
           {
@@ -925,22 +717,6 @@
             "schema": {
               "type": "string",
               "title": "Watchlist Id"
-            }
-          },
-          {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
             }
           },
           {
@@ -1015,22 +791,6 @@
             }
           },
           {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
-          {
             "name": "X-API-Key",
             "in": "header",
             "required": false,
@@ -1055,8 +815,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "type": "object"
                   },
                   "title": "Response Get Quotes V2 V2 Quotes Get"
                 }
@@ -1109,22 +868,6 @@
             }
           },
           {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
-          {
             "name": "X-API-Key",
             "in": "header",
             "required": false,
@@ -1149,8 +892,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "type": "object"
                   },
                   "title": "Response Get Trades V2 V2 Trades Get"
                 }
@@ -1220,22 +962,6 @@
             }
           },
           {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          },
-          {
             "name": "X-API-Key",
             "in": "header",
             "required": false,
@@ -1260,8 +986,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "type": "object"
                   },
                   "title": "Response Get Bars V2 V2 Bars Get"
                 }
@@ -1360,7 +1085,6 @@
           "take_profit": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -1372,7 +1096,6 @@
           "stop_loss": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -1508,11 +1231,6 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key"
-      },
-      "EdgeApiKeyQuery": {
-        "type": "apiKey",
-        "in": "query",
-        "name": "api_key"
       }
     }
   },
@@ -1524,9 +1242,6 @@
   "security": [
     {
       "EdgeApiKey": []
-    },
-    {
-      "EdgeApiKeyQuery": []
     }
   ]
 }

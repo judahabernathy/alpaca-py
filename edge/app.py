@@ -250,9 +250,8 @@ async def _request_with_retry(
 
 
 
-def _require_gateway_key(header_key: Optional[str], fallback_key: Optional[str] = None) -> None:
-    provided = header_key or fallback_key
-    if EDGE_API_KEY and provided != EDGE_API_KEY:
+def _require_gateway_key(header_key: Optional[str]) -> None:
+    if EDGE_API_KEY and header_key != EDGE_API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
@@ -405,19 +404,14 @@ def healthz():
 @app.post("/v2/orders/sync")
 def order_create_sync(
     order: CreateOrder,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    """Synchronous helper that submits an order to Alpaca.
+    """Synchronously mirror `/v2/orders` in the current thread.
 
-    This endpoint mirrors `/v2/orders` but executes the request in the current
-    thread. Upstream rate limits propagate as HTTP 429 responses that include a
-    `Retry-After` header; clients must respect that delay before retrying. When
-    `extended_hours` is true the payload must represent a limit order with
-    `time_in_force="day"`, have a `limit_price`, and omit advanced
-    `order_class` values.
+    Applies the limit guard (extended-hours must be DAY limit orders)
+    and surfaces upstream HTTP 429 responses with their `Retry-After`.
     """
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     payload = _order_payload_from_model(order)
     return _submit_order_sync(payload)
 
@@ -425,29 +419,23 @@ def order_create_sync(
 @app.post("/v2/orders")
 async def order_create(
     order: CreateOrder,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    """Submit an order to Alpaca's `/v2/orders` endpoint.
+    """Submit an order via Alpaca's `/v2/orders`. 
 
-    All requests require an `X-API-Key` header (or `api_key` query parameter).
-    Alpaca may return HTTP 429 responses when rate limits are exceeded; the
-    response includes a `Retry-After` header which clients must honor before
-    retrying. When `extended_hours` is true, orders must be limit DAY orders,
-    provide `limit_price`, and omit advanced `order_class` values. Those
-    constraints are enforced before the request is forwarded upstream.
+    Requires `X-API-Key`, forwards 429 responses with `Retry-After`, and
+    applies the limit guard (extended-hours must be DAY limit orders).
     """
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     payload = _order_payload_from_model(order)
     return await _submit_order_async(payload)
 
 
 @app.get("/v2/account")
 async def account_get(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     status, headers, body = await _request_with_retry(_get_http_client(), "GET", "/v2/account")
     if status >= 400:
         raise HTTPException(status_code=status, detail=body)
@@ -457,10 +445,9 @@ async def account_get(
 @app.get("/v2/orders")
 async def orders_list(
     status: Optional[str] = Query(None),
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     params = {"status": status} if status else None
     status_code, headers, body = await _request_with_retry(
         _get_http_client(),
@@ -476,10 +463,9 @@ async def orders_list(
 @app.get("/v2/orders/{order_id}")
 async def orders_get_by_id(
     order_id: str,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     status, headers, body = await _request_with_retry(
         _get_http_client(),
         "GET",
@@ -492,10 +478,9 @@ async def orders_get_by_id(
 
 @app.get("/v2/positions")
 async def positions_list_v2(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     status, headers, body = await _request_with_retry(
         _get_http_client(),
         "GET",
@@ -509,10 +494,9 @@ async def positions_list_v2(
 @app.get("/v2/positions/{symbol}")
 async def positions_get(
     symbol: str,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     status, headers, body = await _request_with_retry(
         _get_http_client(),
         "GET",
@@ -526,10 +510,9 @@ async def positions_get(
 @app.delete("/v2/positions")
 async def positions_close_all(
     cancel_orders: bool = Query(False),
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     params = {"cancel_orders": str(cancel_orders).lower()}
     status, headers, body = await _request_with_retry(
         _get_http_client(),
@@ -546,10 +529,9 @@ async def positions_close_all(
 async def positions_close(
     symbol: str,
     cancel_orders: bool = Query(False),
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     params = {"cancel_orders": str(cancel_orders).lower()}
     status, headers, body = await _request_with_retry(
         _get_http_client(),
@@ -567,9 +549,8 @@ async def _proxy_alpaca_request(
     path: str,
     x_api_key: Optional[str],
     payload: Optional[Dict[str, Any]] = None,
-    fallback_api_key: Optional[str] = None,
 ):
-    _require_gateway_key(x_api_key, fallback_api_key)
+    _require_gateway_key(x_api_key)
     status, headers, body = await _request_with_retry(
         _get_http_client(),
         method,
@@ -595,24 +576,21 @@ async def _proxy_alpaca_request(
 
 @app.get("/v2/watchlists")
 async def watchlists_list_v2(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    return await _proxy_alpaca_request("GET", "/v2/watchlists", x_api_key, fallback_api_key=api_key)
+    return await _proxy_alpaca_request("GET", "/v2/watchlists", x_api_key)
 
 
 @app.post("/v2/watchlists")
 async def watchlists_create_v2(
     watchlist: WatchlistIn,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     return await _proxy_alpaca_request(
         "POST",
         "/v2/watchlists",
         x_api_key,
         payload=watchlist.model_dump(),
-        fallback_api_key=api_key,
     )
 
 
@@ -620,11 +598,10 @@ async def watchlists_create_v2(
 @app.get("/v2/watchlists/{watchlist_id}")
 async def watchlists_get_v2(
     watchlist_id: str,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     return await _proxy_alpaca_request(
-        "GET", f"/v2/watchlists/{watchlist_id}", x_api_key, fallback_api_key=api_key
+        "GET", f"/v2/watchlists/{watchlist_id}", x_api_key
     )
 
 
@@ -632,26 +609,23 @@ async def watchlists_get_v2(
 async def watchlists_update_v2(
     watchlist_id: str,
     watchlist: WatchlistIn,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     return await _proxy_alpaca_request(
         "PUT",
         f"/v2/watchlists/{watchlist_id}",
         x_api_key,
         payload=watchlist.model_dump(),
-        fallback_api_key=api_key,
     )
 
 
 @app.delete("/v2/watchlists/{watchlist_id}")
 async def watchlists_delete_v2(
     watchlist_id: str,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     return await _proxy_alpaca_request(
-        "DELETE", f"/v2/watchlists/{watchlist_id}", x_api_key, fallback_api_key=api_key
+        "DELETE", f"/v2/watchlists/{watchlist_id}", x_api_key
     )
 
 
@@ -662,10 +636,9 @@ def get_quotes_v2(
     symbol: str,
     start: str,
     end: str,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ) -> list[dict]:
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     req = StockQuotesRequest(
         symbol_or_symbols=[symbol],
         start=datetime.fromisoformat(start),
@@ -683,10 +656,9 @@ def get_trades_v2(
     symbol: str,
     start: str,
     end: str,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ) -> list[dict]:
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     req = StockTradesRequest(
         symbol_or_symbols=[symbol],
         start=datetime.fromisoformat(start),
@@ -705,10 +677,9 @@ def get_bars_v2(
     timeframe: str = Query("1Day"),
     start: str = Query(...),
     end: Optional[str] = None,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    api_key: Optional[str] = Query(None, alias="api_key"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ) -> list[dict]:
-    _require_gateway_key(x_api_key, api_key)
+    _require_gateway_key(x_api_key)
     tf = parse_timeframe(timeframe)
     req = StockBarsRequest(
         symbol_or_symbols=[symbol],
@@ -763,8 +734,7 @@ def _custom_openapi():
     components = schema.setdefault("components", {})
     security_schemes = components.setdefault("securitySchemes", {})
     security_schemes["EdgeApiKey"] = {"type": "apiKey", "in": "header", "name": "X-API-Key"}
-    security_schemes["EdgeApiKeyQuery"] = {"type": "apiKey", "in": "query", "name": "api_key"}
-    schema["security"] = [{"EdgeApiKey": []}, {"EdgeApiKeyQuery": []}]
+    schema["security"] = [{"EdgeApiKey": []}]
 
     info = schema.setdefault("info", {})
     info["description"] = dedent(

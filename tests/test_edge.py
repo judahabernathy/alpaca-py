@@ -403,6 +403,49 @@ def test_evaluate_limit_guard_ignores_quote_errors(monkeypatch):
 
 
 
+def test_evaluate_limit_guard_allows_valid_sell(monkeypatch):
+    symbol = "TSLA"
+    fresh_timestamp = datetime.now(timezone.utc)
+
+    class FakeQuote:
+        def __init__(self):
+            self.timestamp = fresh_timestamp
+            self.bid_price = 101
+            self.ask_price = 102
+
+    class FakeClient:
+        def get_stock_latest_quote(self, request):
+            return {symbol: FakeQuote()}
+
+    monkeypatch.setenv("ALPHA_MAX_DRIFT_BPS", "150")
+    monkeypatch.setenv("ALPHA_QUOTE_TTL_SECONDS", "45")
+    monkeypatch.setattr(app, "md_client", lambda: FakeClient())
+
+    app.evaluate_limit_guard(symbol, 100.5, "sell")
+
+
+def test_evaluate_limit_guard_allows_valid_payload(monkeypatch):
+    symbol = "AAPL"
+    fresh_timestamp = datetime.now(timezone.utc)
+
+    class FakeQuote:
+        def __init__(self):
+            self.timestamp = fresh_timestamp
+            self.bid_price = 99
+            self.ask_price = 100
+
+    class FakeClient:
+        def get_stock_latest_quote(self, request):
+            return {symbol: FakeQuote()}
+
+    monkeypatch.setenv("ALPHA_MAX_DRIFT_BPS", "200")
+    monkeypatch.setenv("ALPHA_QUOTE_TTL_SECONDS", "30")
+    monkeypatch.setattr(app, "md_client", lambda: FakeClient())
+
+    # Should not raise for a limit well within drift tolerance
+    app.evaluate_limit_guard(symbol, 100.1, "buy")
+
+
 def test_evaluate_limit_guard_invalid_limit_price():
     with pytest.raises(HTTPException) as excinfo:
         app.evaluate_limit_guard("AAPL", "oops", "buy")
@@ -652,6 +695,57 @@ async def test_submit_order_async_invalid_json(monkeypatch):
 
     with pytest.raises(HTTPException):
         await app._submit_order_async({"symbol": "AAPL"})
+
+
+@pytest.mark.asyncio
+async def test_order_create_endpoint(monkeypatch):
+    payloads = {}
+
+    def fake_require(header):
+        payloads['auth'] = header
+
+    def fake_payload(model):
+        return {'symbol': model.symbol}
+
+    async def fake_submit(payload):
+        payloads['submitted'] = payload
+        return {'ok': True}
+
+    monkeypatch.setattr(app, "_require_gateway_key", fake_require)
+    monkeypatch.setattr(app, "_order_payload_from_model", fake_payload)
+    monkeypatch.setattr(app, "_submit_order_async", fake_submit)
+
+    model = app.CreateOrder(symbol="AAPL", side="buy", type="market", time_in_force="day")
+    result = await app.order_create(model, x_api_key="key")
+
+    assert result == {'ok': True}
+    assert payloads['auth'] == "key"
+    assert payloads['submitted'] == {'symbol': 'AAPL'}
+
+
+def test_order_create_sync_endpoint(monkeypatch):
+    payloads = {}
+
+    def fake_require(header):
+        payloads['auth'] = header
+
+    def fake_payload(model):
+        return {'symbol': model.symbol}
+
+    def fake_submit(payload):
+        payloads['submitted'] = payload
+        return {'ok': True}
+
+    monkeypatch.setattr(app, "_require_gateway_key", fake_require)
+    monkeypatch.setattr(app, "_order_payload_from_model", fake_payload)
+    monkeypatch.setattr(app, "_submit_order_sync", fake_submit)
+
+    model = app.CreateOrder(symbol="AAPL", side="buy", type="market", time_in_force="day")
+    result = app.order_create_sync(model, x_api_key="key")
+
+    assert result == {'ok': True}
+    assert payloads['auth'] == "key"
+    assert payloads['submitted'] == {'symbol': 'AAPL'}
 
 
 def test_submit_order_sync_uses_event_loop(monkeypatch):
