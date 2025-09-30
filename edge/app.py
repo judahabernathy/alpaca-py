@@ -476,6 +476,31 @@ async def orders_get_by_id(
     return _decode_json(headers, body)
 
 
+@app.delete("/v2/orders")
+async def orders_cancel_all(
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+):
+    """Cancel all open orders."""
+    return await _proxy_alpaca_request(
+        "DELETE",
+        "/v2/orders",
+        x_api_key,
+    )
+
+
+@app.delete("/v2/orders/{order_id}")
+async def orders_cancel_by_id(
+    order_id: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+):
+    """Cancel a specific order by id."""
+    return await _proxy_alpaca_request(
+        "DELETE",
+        f"/v2/orders/{order_id}",
+        x_api_key,
+    )
+
+
 @app.get("/v2/positions")
 async def positions_list_v2(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key")
