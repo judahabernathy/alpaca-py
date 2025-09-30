@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 from uuid import uuid4
 
 import yaml
@@ -79,24 +79,19 @@ async def correlation_middleware(request: Request, call_next):
     finally:
         reset_correlation_id(token)
 
-def evaluate_limit_guard(
-    *,
-    payload: Dict[str, Any],
-    extended_hours: bool,
-    time_in_force: str,
-    order_type: str,
-) -> Dict[str, Any]:
-    result: Dict[str, Any] = {"ok": True, "reason": None, "age": None, "drift": None, "debug": {}}
-    if (order_type or "").lower() != "limit":
-        return result
+def evaluate_limit_guard(symbol: str, limit_price: Any, side: str) -> None:
+    symbol_code = (symbol or "").upper()
+    if not symbol_code or limit_price is None:
+        return
 
-    symbol = (payload.get("symbol") or "").upper()
-    limit_price = payload.get("limit_price")
-    side = (payload.get("side") or "").lower()
+    try:
+        limit_value = float(cast(Union[str, float, int], limit_price))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail={"reason": "invalid_limit_price"}) from None
 
-    if not symbol or limit_price is None or side not in {"buy", "sell"}:
-        result["debug"] = {"skipped": "missing-order-context"}
-        return result
+    normalised_side = (side or "").lower()
+    if normalised_side not in {"buy", "sell"}:
+        return
 
     try:
         ttl_seconds = float(os.getenv("ALPHA_QUOTE_TTL_SECONDS", "10"))
@@ -109,21 +104,17 @@ def evaluate_limit_guard(
         drift_bps = 100.0
 
     feed = os.getenv("ALPHA_QUOTE_FEED", "iex")
-    result["debug"] = {"feed": feed, "time_in_force": time_in_force, "extended_hours": bool(extended_hours)}
 
     try:
-        client = md_client()
-        latest = client.get_stock_latest_quote(
-            StockLatestQuoteRequest(symbol_or_symbols=symbol, feed=feed)  # type: ignore[arg-type]
+        latest = md_client().get_stock_latest_quote(
+            StockLatestQuoteRequest(symbol_or_symbols=symbol_code, feed=feed)  # type: ignore[arg-type]
         )
-        quote = latest.get(symbol) if isinstance(latest, dict) else None
-    except Exception as exc:
-        result["debug"]["quote_error"] = str(exc)
-        return result
+    except Exception:
+        return
 
+    quote = latest.get(symbol_code) if isinstance(latest, dict) else None
     if quote is None:
-        result["debug"]["quote_missing"] = True
-        return result
+        return
 
     timestamp = getattr(quote, "timestamp", None)
     if isinstance(timestamp, str):
@@ -132,51 +123,44 @@ def evaluate_limit_guard(
         except ValueError:
             timestamp = None
     if timestamp is None:
-        result["debug"]["timestamp_missing"] = True
-        return result
+        return
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=timezone.utc)
 
     now = datetime.now(timezone.utc)
     age = max((now - timestamp).total_seconds(), 0.0)
-    result["age"] = age
-    result["debug"]["quote_timestamp"] = timestamp.isoformat()
-    result["debug"]["ttl_seconds"] = ttl_seconds
+    if age > max(ttl_seconds, 0.0):
+        raise HTTPException(
+            status_code=428,
+            detail={"reason": "stale", "age": age, "ttl_seconds": ttl_seconds, "feed": feed},
+        )
 
-    if age > ttl_seconds:
-        result.update({"ok": False, "reason": "stale"})
-        return result
-
-    bid_price = getattr(quote, "bid_price", None)
-    ask_price = getattr(quote, "ask_price", None)
-    reference = ask_price if side == "buy" else bid_price
-    result["debug"].update({"bid_price": bid_price, "ask_price": ask_price})
-
-    if not reference or reference <= 0:
-        result["debug"]["reference_missing"] = reference
-        return result
+    reference_attr = "ask_price" if normalised_side == "buy" else "bid_price"
+    reference = getattr(quote, reference_attr, None)
+    if reference in (None, ""):
+        return
 
     try:
-        reference = float(reference)
-        limit_price_value = float(limit_price)
+        reference_value = float(cast(Union[str, float, int], reference))
     except (TypeError, ValueError):
-        result["debug"]["conversion_error"] = True
-        return result
+        return
 
-    drift = (limit_price_value - reference) / reference
-    result["drift"] = drift
+    if reference_value <= 0:
+        return
 
+    drift = (limit_value - reference_value) / reference_value
     max_drift = max(drift_bps, 0.0) / 10000.0
-    result["debug"]["max_drift"] = max_drift
-
-    if side == "buy" and drift > max_drift:
-        result.update({"ok": False, "reason": "drift"})
-        return result
-    if side == "sell" and (-drift) > max_drift:
-        result.update({"ok": False, "reason": "drift"})
-        return result
-
-    return result
+    exceeds = drift > max_drift if normalised_side == "buy" else (-drift) > max_drift
+    if exceeds:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "drift",
+                "drift": drift,
+                "max_drift": max_drift,
+                "side": normalised_side,
+            },
+        )
 
 
 def _resolve_client_order_id(client_order_id: Optional[str]) -> str:
@@ -207,15 +191,13 @@ def _enforce_ext_policy(payload: Dict[str, Any]) -> Dict[str, Any]:
             raise HTTPException(status_code=400, detail="Extended hours limit orders require limit_price")
 
     if order_type == "limit" and payload.get("limit_price") is not None:
-        guard = evaluate_limit_guard(payload=payload, extended_hours=extended_hours,
-                                     time_in_force=tif, order_type=order_type)
-        if not guard.get("ok", True):
-            reason = (guard.get("reason") or "").lower()
-            if reason == "stale":
-                raise HTTPException(status_code=428, detail=guard)
-            if reason == "drift":
-                raise HTTPException(status_code=409, detail=guard)
-            raise HTTPException(status_code=400, detail=guard)
+        try:
+            evaluate_limit_guard((payload.get("symbol") or ""), payload.get("limit_price"), (payload.get("side") or ""))
+        except HTTPException as exc:
+            if exc.status_code in {400, 409, 428}:
+                raise
+            raise
+
 
     return payload
 

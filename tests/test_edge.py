@@ -249,11 +249,11 @@ def test_ext_requires_limit_day_and_forbids_bracket(monkeypatch):
 def test_ttl_and_drift_gates(monkeypatch):
     os.environ["ALPHA_ENFORCE_EXT"] = "1"
 
-    def fake_eval_stale(**_: Any) -> Dict[str, Any]:
-        return {"ok": False, "reason": "stale", "age": 99, "drift": None, "debug": {}}
+    def fake_eval_stale(symbol, limit_price, side):
+        raise HTTPException(status_code=428, detail={"reason": "stale"})
 
-    def fake_eval_drift(**_: Any) -> Dict[str, Any]:
-        return {"ok": False, "reason": "drift", "age": 1, "drift": 0.0101, "debug": {}}
+    def fake_eval_drift(symbol, limit_price, side):
+        raise HTTPException(status_code=409, detail={"reason": "drift"})
 
     monkeypatch.setattr(app, "evaluate_limit_guard", fake_eval_stale)
     with pytest.raises(HTTPException) as excinfo:
@@ -281,6 +281,11 @@ def test_ttl_and_drift_gates(monkeypatch):
                 "limit_price": 123,
             }
         )
+    assert excinfo.value.status_code == 409
+
+    os.environ.pop("ALPHA_ENFORCE_EXT", None)
+
+
     assert excinfo.value.status_code == 409
 
     os.environ.pop("ALPHA_ENFORCE_EXT", None)
@@ -333,7 +338,6 @@ def test_client_id_passthrough_with_requirement(monkeypatch):
 
 
 def test_evaluate_limit_guard_marks_stale(monkeypatch):
-
     symbol = "AAPL"
     stale_timestamp = datetime.now(timezone.utc) - timedelta(seconds=30)
 
@@ -350,20 +354,15 @@ def test_evaluate_limit_guard_marks_stale(monkeypatch):
     monkeypatch.setenv("ALPHA_QUOTE_TTL_SECONDS", "5")
     monkeypatch.setattr(app, "md_client", lambda: FakeClient())
 
-    result = app.evaluate_limit_guard(
-        payload={"symbol": symbol, "limit_price": 101, "side": "buy"},
-        extended_hours=False,
-        time_in_force="day",
-        order_type="limit",
-    )
+    with pytest.raises(HTTPException) as excinfo:
+        app.evaluate_limit_guard(symbol, 101, "buy")
 
-    assert result["ok"] is False
-    assert result["reason"] == "stale"
+    assert excinfo.value.status_code == 428
+    assert excinfo.value.detail["reason"] == "stale"
 
 
 
 def test_evaluate_limit_guard_marks_drift(monkeypatch):
-
     symbol = "TSLA"
     fresh_timestamp = datetime.now(timezone.utc)
 
@@ -378,19 +377,38 @@ def test_evaluate_limit_guard_marks_drift(monkeypatch):
             return {symbol: FakeQuote()}
 
     monkeypatch.setenv("ALPHA_QUOTE_TTL_SECONDS", "60")
-    monkeypatch.setenv("ALPHA_MAX_DRIFT_BPS", "50")  # 0.5%
+    monkeypatch.setenv("ALPHA_MAX_DRIFT_BPS", "50")
     monkeypatch.setattr(app, "md_client", lambda: FakeClient())
 
-    result = app.evaluate_limit_guard(
-        payload={"symbol": symbol, "limit_price": 101, "side": "buy"},
-        extended_hours=False,
-        time_in_force="day",
-        order_type="limit",
-    )
+    with pytest.raises(HTTPException) as excinfo:
+        app.evaluate_limit_guard(symbol, 101, "buy")
 
-    assert result["ok"] is False
-    assert result["reason"] == "drift"
+    assert excinfo.value.status_code == 409
+    assert excinfo.value.detail["reason"] == "drift"
 
+
+
+def test_evaluate_limit_guard_allows_missing_context():
+    app.evaluate_limit_guard("", None, "buy")
+
+
+
+def test_evaluate_limit_guard_ignores_quote_errors(monkeypatch):
+    class RaisingClient:
+        def get_stock_latest_quote(self, request):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(app, "md_client", lambda: RaisingClient())
+    app.evaluate_limit_guard("AAPL", 1, "buy")
+
+
+
+def test_evaluate_limit_guard_invalid_limit_price():
+    with pytest.raises(HTTPException) as excinfo:
+        app.evaluate_limit_guard("AAPL", "oops", "buy")
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail["reason"] == "invalid_limit_price"
 
 
 def test_enforce_ext_policy_rejects_advanced_order_class(monkeypatch):
@@ -570,125 +588,6 @@ async def test_spec_serving(monkeypatch, tmp_path):
     assert app.well_known_openapi_yaml().media_type == "application/yaml"
     assert app.openapi_json_alias().media_type == "application/json"
     assert app.openapi_yaml_alias().media_type == "application/yaml"
-
-def test_evaluate_limit_guard_missing_context():
-
-    result = app.evaluate_limit_guard(
-        payload={"limit_price": None, "side": "buy"},
-        extended_hours=False,
-        time_in_force="day",
-        order_type="limit",
-    )
-
-    assert result["debug"]["skipped"] == "missing-order-context"
-
-
-def test_evaluate_limit_guard_quote_error(monkeypatch):
-
-    class RaisingClient:
-        def get_stock_latest_quote(self, request):
-            raise RuntimeError("boom")
-
-    monkeypatch.setattr(app, "md_client", lambda: RaisingClient())
-
-    result = app.evaluate_limit_guard(
-        payload={"symbol": "AAPL", "limit_price": 1, "side": "buy"},
-        extended_hours=False,
-        time_in_force="day",
-        order_type="limit",
-    )
-
-    assert result["debug"]["quote_error"] == "boom"
-
-
-def test_evaluate_limit_guard_quote_missing(monkeypatch):
-
-    class FakeClient:
-        def get_stock_latest_quote(self, request):
-            return {}
-
-    monkeypatch.setattr(app, "md_client", lambda: FakeClient())
-
-    result = app.evaluate_limit_guard(
-        payload={"symbol": "AAPL", "limit_price": 1, "side": "buy"},
-        extended_hours=False,
-        time_in_force="day",
-        order_type="limit",
-    )
-
-    assert result["debug"]["quote_missing"] is True
-
-
-def test_evaluate_limit_guard_timestamp_missing(monkeypatch):
-
-    class FakeQuote:
-        timestamp = None
-        bid_price = 1
-        ask_price = 1
-
-    class FakeClient:
-        def get_stock_latest_quote(self, request):
-            return {"AAPL": FakeQuote()}
-
-    monkeypatch.setattr(app, "md_client", lambda: FakeClient())
-
-    result = app.evaluate_limit_guard(
-        payload={"symbol": "AAPL", "limit_price": 1, "side": "buy"},
-        extended_hours=False,
-        time_in_force="day",
-        order_type="limit",
-    )
-
-    assert result["debug"]["timestamp_missing"] is True
-
-
-def test_evaluate_limit_guard_reference_missing(monkeypatch):
-    from datetime import datetime, timezone
-
-    class FakeQuote:
-        timestamp = datetime.now(timezone.utc)
-        bid_price = None
-        ask_price = None
-
-    class FakeClient:
-        def get_stock_latest_quote(self, request):
-            return {"AAPL": FakeQuote()}
-
-    monkeypatch.setattr(app, "md_client", lambda: FakeClient())
-
-    result = app.evaluate_limit_guard(
-        payload={"symbol": "AAPL", "limit_price": 1, "side": "buy"},
-        extended_hours=False,
-        time_in_force="day",
-        order_type="limit",
-    )
-
-    assert result["debug"]["reference_missing"] is None
-
-
-def test_evaluate_limit_guard_conversion_error(monkeypatch):
-    from datetime import datetime, timezone
-
-    class FakeQuote:
-        timestamp = datetime.now(timezone.utc)
-        bid_price = 1
-        ask_price = 1
-
-    class FakeClient:
-        def get_stock_latest_quote(self, request):
-            return {"AAPL": FakeQuote()}
-
-    monkeypatch.setattr(app, "md_client", lambda: FakeClient())
-
-    result = app.evaluate_limit_guard(
-        payload={"symbol": "AAPL", "limit_price": "oops", "side": "buy"},
-        extended_hours=False,
-        time_in_force="day",
-        order_type="limit",
-    )
-
-    assert result["debug"]["conversion_error"] is True
-
 
 def test_order_payload_from_model_variants():
 
