@@ -920,7 +920,7 @@ except Exception:
 def _build_openapi_schema(routes) -> Dict[str, Any]:
     schema = get_openapi(
         title="Alpaca Wrapper",
-        version="1.0.0",
+        version="1.1.0",
         routes=routes,
     )
     schema["openapi"] = "3.1.0"
