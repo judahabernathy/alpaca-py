@@ -848,6 +848,22 @@ def test_parse_timeframe_errors():
         app.parse_timeframe("5Year")
 
 
+def test_default_server_url_and_normalisation(monkeypatch):
+
+    monkeypatch.delenv("SERVER_URL", raising=False)
+    monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+    monkeypatch.delenv("RAILWAY_STATIC_URL", raising=False)
+    assert app._default_server_url() == app.PRODUCTION_SERVER_URL
+
+    monkeypatch.setenv("SERVER_URL", "http://example.test/api")
+    assert app._default_server_url() == "http://example.test/api"
+
+    monkeypatch.setenv("SERVER_URL", "http://alpaca-py-production.up.railway.app")
+    assert app._default_server_url() == app.PRODUCTION_SERVER_URL
+
+    assert app._normalise_server_url("http://alpaca-py-production.up.railway.app") == app.PRODUCTION_SERVER_URL
+
+
 def test_alpaca_credentials_present(monkeypatch):
 
     monkeypatch.delenv("APCA_API_KEY_ID", raising=False)

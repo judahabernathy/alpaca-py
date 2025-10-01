@@ -34,7 +34,7 @@ def readyz(request: Request) -> dict:
 def well_known_openapi(request: Request) -> JSONResponse:
     edge_app = _app_module()
     base_schema = deepcopy(edge_app._build_openapi_schema(edge_app.app.routes))
-    base_schema["servers"] = [{"url": str(request.base_url).rstrip("/")}]
+    base_schema["servers"] = [{"url": edge_app._normalise_server_url(str(request.base_url))}]
     return JSONResponse(base_schema)
 
 

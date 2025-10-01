@@ -10,6 +10,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union, cast
 from uuid import uuid4
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.params import Param
@@ -330,11 +331,24 @@ def _resolved_api_base_url() -> str:
     return configured.rstrip("/")
 
 
+def _normalise_server_url(url: str) -> str:
+    parsed = urlparse((url or "").strip() or PRODUCTION_SERVER_URL)
+    if not parsed.scheme:
+        parsed = parsed._replace(scheme="https")
+    production_host = urlparse(PRODUCTION_SERVER_URL).netloc.lower()
+    if parsed.netloc.lower() == production_host and parsed.scheme != "https":
+        parsed = parsed._replace(scheme="https")
+    if not parsed.netloc:
+        parsed = urlparse(PRODUCTION_SERVER_URL)
+    normalised_path = parsed.path.rstrip("/") or ""
+    return urlunparse(parsed._replace(path=normalised_path))
+
+
 def _default_server_url() -> str:
     for env_var in ("SERVER_URL", "PUBLIC_BASE_URL", "RAILWAY_STATIC_URL"):
         configured = os.getenv(env_var, "").strip()
         if configured:
-            return configured.rstrip("/")
+            return _normalise_server_url(configured)
     return PRODUCTION_SERVER_URL
 
 
