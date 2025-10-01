@@ -27,7 +27,7 @@ from alpaca.data.requests import (
     StockTradesRequest,
 )
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
-from config import APCA_API_BASE_URL
+from config import APCA_API_BASE_URL, APCA_DATA_BASE_URL, DEFAULT_DATA_BASE_URL
 
 from .http import EdgeHttpClient
 from .logging import (
@@ -43,6 +43,8 @@ DEFAULT_API_BASE_URL = "https://paper-api.alpaca.markets"
 PRODUCTION_SERVER_URL = "https://alpaca-py-production.up.railway.app"
 API_BASE_URL = (os.getenv("APCA_API_BASE_URL") or APCA_API_BASE_URL or DEFAULT_API_BASE_URL).strip() or DEFAULT_API_BASE_URL
 API_BASE_URL = API_BASE_URL.rstrip("/")
+DATA_BASE_URL = (os.getenv("APCA_DATA_BASE_URL") or APCA_DATA_BASE_URL or DEFAULT_DATA_BASE_URL).strip() or DEFAULT_DATA_BASE_URL
+DATA_BASE_URL = DATA_BASE_URL.rstrip("/")
 API_KEY_ID = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_API_KEY_ID")
 API_SECRET_KEY = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_API_SECRET_KEY")
 EDGE_API_KEY = (
@@ -56,17 +58,28 @@ configure_logging()
 
 @asynccontextmanager
 async def _app_lifespan(application: FastAPI):
-    client = EdgeHttpClient(API_BASE_URL)
-    await client.startup()
-    application.state.http_client = client
+    trading_client = EdgeHttpClient(API_BASE_URL)
+    data_client = EdgeHttpClient(DATA_BASE_URL)
+    await trading_client.startup()
+    await data_client.startup()
+    application.state.trading_http_client = trading_client
+    application.state.data_http_client = data_client
+    application.state.http_client = trading_client  # legacy compatibility
     log_event("startup_complete")
     try:
         yield
     finally:
-        client_ref = getattr(application.state, "http_client", None)
-        if client_ref is not None:
-            await client_ref.shutdown()
-            application.state.http_client = None
+        seen: set[int] = set()
+        for attr in ("trading_http_client", "data_http_client", "http_client"):
+            client_ref = getattr(application.state, attr, None)
+            if client_ref is None:
+                continue
+            if id(client_ref) not in seen:
+                try:
+                    await client_ref.shutdown()
+                finally:
+                    seen.add(id(client_ref))
+            setattr(application.state, attr, None)
         log_event("shutdown_complete")
 
 
@@ -352,11 +365,31 @@ def _default_server_url() -> str:
     return PRODUCTION_SERVER_URL
 
 
-def _get_http_client() -> EdgeHttpClient:
-    client = getattr(app.state, "http_client", None)
+def _get_trading_http_client() -> EdgeHttpClient:
+    client = getattr(app.state, "trading_http_client", None) or getattr(app.state, "http_client", None)
     if client is None:
-        raise HTTPException(status_code=500, detail="HTTP client is unavailable")
+        raise HTTPException(status_code=500, detail="Trading HTTP client is unavailable")
     return client
+
+
+
+def _get_data_http_client() -> EdgeHttpClient:
+    client = getattr(app.state, "data_http_client", None)
+    if client is None:
+        raise HTTPException(status_code=500, detail="Data HTTP client is unavailable")
+    return client
+
+
+
+def _get_http_client() -> EdgeHttpClient:
+    return _get_trading_http_client()
+
+
+def _http_client_for_path(path: str) -> EdgeHttpClient:
+    normalised = (path or "").lower()
+    if normalised.startswith('/v2/stocks') or normalised.startswith('/v2/marketdata'):
+        return _get_data_http_client()
+    return _get_trading_http_client()
 
 
 def _decode_json(headers: Dict[str, str], body: str) -> Any:
@@ -423,7 +456,7 @@ def _prepare_order_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 async def _submit_order_async(payload: Dict[str, Any]) -> Dict[str, Any]:
     prepared = _prepare_order_payload(payload)
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "POST",
         "/v2/orders",
         json=prepared,
@@ -470,18 +503,20 @@ def parse_timeframe(tf_str: str) -> TimeFrame:
 
 @app.get("/healthz")
 def healthz():
-    client_ready = isinstance(getattr(app.state, "http_client", None), EdgeHttpClient)
+    trading_ready = isinstance(getattr(app.state, "trading_http_client", None) or getattr(app.state, "http_client", None), EdgeHttpClient)
+    data_ready = isinstance(getattr(app.state, "data_http_client", None), EdgeHttpClient)
     creds_ok = _alpaca_credentials_present()
     dependencies = {
-        "http_client": client_ready,
+        "trading_http_client": trading_ready,
+        "data_http_client": data_ready,
         "alpaca_credentials": creds_ok,
         "api_base_url": bool(API_BASE_URL),
+        "data_api_base_url": bool(DATA_BASE_URL),
     }
     return {
         "ok": all(dependencies.values()),
         "dependencies": dependencies,
     }
-
 
 
 
@@ -522,7 +557,7 @@ async def order_create(
 @app.get("/v2/account")
 async def account_get(request: Request):
     _require_gateway_key_from_request(request)
-    status, headers, body = await _request_with_retry(_get_http_client(), "GET", "/v2/account")
+    status, headers, body = await _request_with_retry(_get_trading_http_client(), "GET", "/v2/account")
     if status >= 400:
         raise HTTPException(status_code=status, detail=body)
     return _decode_json(headers, body)
@@ -556,7 +591,7 @@ async def account_activities(
         if value is not None
     }
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "GET",
         "/v2/account/activities",
         params=filtered or None,
@@ -580,7 +615,7 @@ async def orders_list(request: Request):
     _require_gateway_key_from_request(request)
     params = dict(request.query_params)
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "GET",
         "/v2/orders",
         params=params or None,
@@ -593,7 +628,7 @@ async def orders_list(request: Request):
 async def orders_get_by_id(order_id: str, request: Request):
     _require_gateway_key_from_request(request)
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "GET",
         f"/v2/orders/{order_id}",
     )
@@ -628,7 +663,7 @@ async def positions_list_v2(request: Request):
     _require_gateway_key_from_request(request)
     params = dict(request.query_params)
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "GET",
         "/v2/positions",
         params=params or None,
@@ -641,7 +676,7 @@ async def positions_list_v2(request: Request):
 async def positions_get(symbol: str, request: Request):
     _require_gateway_key_from_request(request)
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "GET",
         f"/v2/positions/{symbol}",
     )
@@ -657,7 +692,7 @@ async def positions_close_all(
     _require_gateway_key_from_request(request)
     params = {"cancel_orders": str(cancel_orders).lower()}
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "DELETE",
         "/v2/positions",
         params=params,
@@ -675,7 +710,7 @@ async def positions_close(
     _require_gateway_key_from_request(request)
     params = {"cancel_orders": str(cancel_orders).lower()}
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "DELETE",
         f"/v2/positions/{symbol}",
         params=params,
@@ -693,7 +728,7 @@ async def _proxy_alpaca_request(
 ):
     _require_gateway_key_from_request(request)
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _http_client_for_path(path),
         method,
         path,
         json=payload,
@@ -721,7 +756,7 @@ async def watchlists_list_v2(request: Request):
     _require_gateway_key_from_request(request)
     params = dict(request.query_params)
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "GET",
         "/v2/watchlists",
         params=params or None,
@@ -750,7 +785,7 @@ async def watchlists_get_v2(watchlist_id: str, request: Request):
     _require_gateway_key_from_request(request)
     params = dict(request.query_params)
     status, headers, body = await _request_with_retry(
-        _get_http_client(),
+        _get_trading_http_client(),
         "GET",
         f"/v2/watchlists/{watchlist_id}",
         params=params or None,

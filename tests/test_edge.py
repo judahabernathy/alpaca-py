@@ -77,9 +77,30 @@ async def test_lifespan_manages_http_client(monkeypatch):
 
     async with app._app_lifespan(application):
         assert isinstance(application.state.http_client, FakeClient)
+        assert isinstance(application.state.trading_http_client, FakeClient)
+        assert isinstance(application.state.data_http_client, FakeClient)
 
     assert application.state.http_client is None
-    assert events == [("init", app.API_BASE_URL), ("startup",), ("shutdown",)]
+    assert getattr(application.state, "trading_http_client", None) is None
+    assert getattr(application.state, "data_http_client", None) is None
+    assert events == [
+        ("init", app.API_BASE_URL),
+        ("init", app.DATA_BASE_URL),
+        ("startup",),
+        ("startup",),
+        ("shutdown",),
+        ("shutdown",),
+    ]
+
+
+def test_get_http_client_requires_startup(monkeypatch):
+    monkeypatch.setattr(app.app.state, "http_client", None, raising=False)
+    monkeypatch.setattr(app.app.state, "trading_http_client", None, raising=False)
+
+    with pytest.raises(HTTPException) as excinfo:
+        app._get_http_client()
+
+    assert excinfo.value.status_code == 500
 
 
 def test_get_http_client_requires_startup(monkeypatch):
@@ -600,7 +621,9 @@ async def test_gateway_routes_and_market_data(monkeypatch):
     monkeypatch.delenv("EDGE_API_KEY", raising=False)
     monkeypatch.delenv("X_API_KEY", raising=False)
     monkeypatch.setattr(app, "EDGE_API_KEY", "edge-key", raising=False)
-    monkeypatch.setattr(app, "_get_http_client", lambda: fake_client)
+    monkeypatch.setattr(app, "_get_trading_http_client", lambda: fake_client)
+    monkeypatch.setattr(app, "_get_data_http_client", lambda: fake_client)
+    monkeypatch.setattr(app, "_http_client_for_path", lambda path: fake_client)
 
     account = await app.account_get(gateway_request("/v2/account"))
     assert account == {"id": "acct"}
@@ -742,7 +765,7 @@ async def test_submit_order_async_success(monkeypatch):
         return 200, {"Content-Type": "application/json"}, json.dumps({"ok": True})
 
     monkeypatch.setattr(app, "_request_with_retry", fake_request)
-    monkeypatch.setattr(app, "_get_http_client", lambda: object())
+    monkeypatch.setattr(app, "_get_trading_http_client", lambda: object())
 
     result = await app._submit_order_async({"symbol": "AAPL"})
     assert result["ok"] is True
@@ -756,7 +779,7 @@ async def test_submit_order_async_error(monkeypatch):
         return 500, {"Content-Type": "text/plain"}, "boom"
 
     monkeypatch.setattr(app, "_request_with_retry", fake_request)
-    monkeypatch.setattr(app, "_get_http_client", lambda: object())
+    monkeypatch.setattr(app, "_get_trading_http_client", lambda: object())
 
     with pytest.raises(HTTPException) as excinfo:
         await app._submit_order_async({"symbol": "AAPL"})
@@ -772,7 +795,7 @@ async def test_submit_order_async_invalid_json(monkeypatch):
         return 200, {"Content-Type": "application/json"}, "not json"
 
     monkeypatch.setattr(app, "_request_with_retry", fake_request)
-    monkeypatch.setattr(app, "_get_http_client", lambda: object())
+    monkeypatch.setattr(app, "_get_trading_http_client", lambda: object())
 
     with pytest.raises(HTTPException):
         await app._submit_order_async({"symbol": "AAPL"})
@@ -862,6 +885,16 @@ def test_default_server_url_and_normalisation(monkeypatch):
     assert app._default_server_url() == app.PRODUCTION_SERVER_URL
 
     assert app._normalise_server_url("http://alpaca-py-production.up.railway.app") == app.PRODUCTION_SERVER_URL
+
+
+
+def test_http_client_for_path_selects_data(monkeypatch):
+
+    monkeypatch.setattr(app, '_get_data_http_client', lambda: 'data')
+    monkeypatch.setattr(app, '_get_trading_http_client', lambda: 'trading')
+
+    assert app._http_client_for_path('/v2/stocks/aapl') == 'data'
+    assert app._http_client_for_path('/v2/orders') == 'trading'
 
 
 def test_alpaca_credentials_present(monkeypatch):
@@ -961,7 +994,7 @@ async def test_account_activities_translates_unauthorized(monkeypatch):
         assert kwargs.get("params") == {"direction": "desc"}
         return 401, {"Content-Type": "application/json"}, '{"message": "unauthorized"}'
 
-    monkeypatch.setattr(app, "_get_http_client", lambda: object())
+    monkeypatch.setattr(app, "_get_trading_http_client", lambda: object())
     monkeypatch.setattr(app, "_request_with_retry", fake_request_with_retry)
 
     response = await app.account_activities(

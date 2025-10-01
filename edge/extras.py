@@ -21,11 +21,13 @@ def readyz(request: Request) -> dict:
     edge_app._require_gateway_key_from_request(request)
     credentials_ok = edge_app._alpaca_credentials_present()
     base_url = edge_app._resolved_api_base_url()
+    data_base_url = edge_app.DATA_BASE_URL
     return {
-        "ok": credentials_ok and bool(base_url),
+        "ok": credentials_ok and bool(base_url) and bool(data_base_url),
         "env": {
             "alpaca_credentials": credentials_ok,
             "api_base_url": base_url,
+            "data_api_base_url": data_base_url,
         },
     }
 

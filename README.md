@@ -52,6 +52,7 @@ You can also find the API Reference of Alpaca APIs: https://docs.alpaca.markets/
 python -m venv .venv; . .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 $env:APCA_API_BASE_URL="https://paper-api.alpaca.markets"
+$env:APCA_DATA_BASE_URL="https://data.alpaca.markets"
 $env:APCA_API_KEY_ID="<PK-KEY-HERE>"; $env:APCA_API_SECRET_KEY="<SECRET-HERE>"
 $env:EDGE_API_KEY="edge-key"
 uvicorn edge.app:app --host 0.0.0.0 --port 8000 --reload
@@ -59,13 +60,14 @@ uvicorn edge.app:app --host 0.0.0.0 --port 8000 --reload
 
 > Notes:
 > - The root-level `app.py` module is kept for legacy examples only. Deployments should import `edge.app:app`.
+> - Override `APCA_API_BASE_URL` and `APCA_DATA_BASE_URL` when pointing at non-default trading or market data clusters.
 > - PowerShell requires URLs with query strings to be wrapped in quotes, for example `"https://example.test/v2/orders?status=filled"`.
 
 #### Railway Deployment
 
 1. Run `railway link` and choose the project, environment, and service.
 2. Configure environment variables:
-   `railway variables set APCA_API_BASE_URL=https://paper-api.alpaca.markets APCA_API_KEY_ID=<PK-KEY> APCA_API_SECRET_KEY=<SECRET> EDGE_API_KEY=<EDGE-KEY> SERVER_URL=https://alpaca-py-production.up.railway.app`
+   `railway variables set APCA_API_BASE_URL=https://paper-api.alpaca.markets APCA_DATA_BASE_URL=https://data.alpaca.markets APCA_API_KEY_ID=<PK-KEY> APCA_API_SECRET_KEY=<SECRET> EDGE_API_KEY=<EDGE-KEY> SERVER_URL=https://alpaca-py-production.up.railway.app`
 3. Start a local instance with the deployment configuration:
    `railway run -- python -m uvicorn edge.app:app --host 127.0.0.1 --port 8000 --reload`
 4. Production traffic hits `https://alpaca-py-production.up.railway.app` by default when no `SERVER_URL` override is set.
