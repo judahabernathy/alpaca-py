@@ -466,22 +466,6 @@ async def _submit_order_async(payload: Dict[str, Any]) -> Dict[str, Any]:
     return _decode_json(headers, body)
 
 
-def _submit_order_sync(payload: Dict[str, Any]) -> Dict[str, Any]:
-    loop = asyncio.new_event_loop()
-    previous_loop = None
-    try:
-        try:
-            previous_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            previous_loop = None
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(_submit_order_async(payload))
-        loop.run_until_complete(loop.shutdown_asyncgens())
-        return result
-    finally:
-        asyncio.set_event_loop(previous_loop)
-        loop.close()
-
 def parse_timeframe(tf_str: str) -> TimeFrame:
     m = re.match(r'^(\d+)([A-Za-z]+)$', tf_str)
     if not m:
@@ -522,7 +506,7 @@ def healthz():
 
 # -- Orders
 @app.post("/v2/orders/sync")
-def order_create_sync(
+async def order_create_sync(
     order: CreateOrder,
     request: Request,
 ):
@@ -533,7 +517,7 @@ def order_create_sync(
     """
     _require_gateway_key_from_request(request)
     payload = _order_payload_from_model(order)
-    return _submit_order_sync(payload)
+    return await _submit_order_async(payload)
 
 
 
