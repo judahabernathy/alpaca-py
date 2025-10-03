@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from alpaca.common.models import ModelWithID
 from alpaca.common.models import ValidateBaseModel as BaseModel
@@ -302,6 +302,33 @@ class ClosePositionResponse(BaseModel):
     status: Optional[int] = None
     symbol: Optional[str] = None
     body: Union[FailedClosePositionDetails, Order]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_body(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+
+        body = values.get("body")
+        if isinstance(body, (FailedClosePositionDetails, Order)):
+            return values
+
+        if isinstance(body, dict):
+            status = values.get("status")
+            try:
+                status_code = int(status) if status is not None else None
+            except (TypeError, ValueError):
+                status_code = None
+
+            has_order_identifiers = any(key in body for key in ("id", "client_order_id"))
+            failure_hint = "message" in body and "code" in body
+
+            if failure_hint and not has_order_identifiers:
+                values["body"] = FailedClosePositionDetails(**body)
+            elif status_code is not None and status_code >= 400 and not has_order_identifiers:
+                values["body"] = FailedClosePositionDetails(**body)
+
+        return values
 
 
 class PortfolioHistory(BaseModel):
