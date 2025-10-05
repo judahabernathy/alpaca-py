@@ -775,7 +775,7 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
                     {"role": "system", "content": [{"type": "input_text", "text": system_prompt}]},
                     {"role": "user", "content": user_content},
                 ],
-                max_output_tokens=1100,
+                max_output_tokens=1800,
                 text_format=OrderPlanResponse,
             )
             break
@@ -796,6 +796,15 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
 
     if isinstance(parsed, OrderPlanResponse):
         return parsed
+    candidate = getattr(parsed, "parsed", None)
+    if isinstance(candidate, OrderPlanResponse):
+        return candidate
+    if hasattr(parsed, "output"):
+        for item in getattr(parsed, "output", []):
+            for content in getattr(item, "content", []) or []:
+                candidate = getattr(content, "parsed", None)
+                if isinstance(candidate, OrderPlanResponse):
+                    return candidate
     try:
         return OrderPlanResponse.model_validate(parsed)
     except Exception as exc:  # pragma: no cover - defensive
