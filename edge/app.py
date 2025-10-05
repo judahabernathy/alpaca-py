@@ -18,7 +18,7 @@ from fastapi.params import Param
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response, FileResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI, OpenAIError
 
@@ -757,28 +757,40 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
 
     payload_text = json.dumps(context, ensure_ascii=False)
 
-    try:
-        parsed = await client.responses.parse(
-            model=OPENAI_MODEL,
-            input=[
-                {"role": "system", "content": [{"type": "input_text", "text": system_prompt}]},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": "Evaluate the proposed Alpaca orders and respond with the JSON schema."},
-                        {"type": "input_text", "text": payload_text},
-                    ],
-                },
-            ],
-            max_output_tokens=1100,
-            text_format=OrderPlanResponse,
-        )
-    except APIConnectionError as exc:
-        raise HTTPException(status_code=502, detail=f"OpenAI connection error: {exc}") from exc
-    except APIStatusError as exc:
-        raise HTTPException(status_code=502, detail=f"OpenAI API error: {exc.status_code}") from exc
-    except OpenAIError as exc:
-        raise HTTPException(status_code=502, detail=f"OpenAI error: {exc}") from exc
+    last_validation_error: ValidationError | None = None
+    parsed: Any | None = None
+    for attempt in range(2):
+        user_content = [
+            {"type": "input_text", "text": "Evaluate the proposed Alpaca orders and respond with the JSON schema."},
+            {"type": "input_text", "text": payload_text},
+        ]
+        if attempt:
+            user_content.insert(0, {"type": "input_text", "text": "Retry: the last response was invalid JSON. Return only valid JSON that matches the schema."})
+        try:
+            parsed = await client.responses.parse(
+                model=OPENAI_MODEL,
+                input=[
+                    {"role": "system", "content": [{"type": "input_text", "text": system_prompt}]},
+                    {"role": "user", "content": user_content},
+                ],
+                max_output_tokens=1100,
+                text_format=OrderPlanResponse,
+            )
+            break
+        except ValidationError as exc:
+            last_validation_error = exc
+            if attempt == 1:
+                raise HTTPException(status_code=502, detail=f"OpenAI payload validation failed: {exc}") from exc
+            continue
+        except APIConnectionError as exc:
+            raise HTTPException(status_code=502, detail=f"OpenAI connection error: {exc}") from exc
+        except APIStatusError as exc:
+            raise HTTPException(status_code=502, detail=f"OpenAI API error: {exc.status_code}") from exc
+        except OpenAIError as exc:
+            raise HTTPException(status_code=502, detail=f"OpenAI error: {exc}") from exc
+
+    if parsed is None:
+        raise HTTPException(status_code=502, detail=f"OpenAI payload validation failed: {last_validation_error}") from last_validation_error
 
     if isinstance(parsed, OrderPlanResponse):
         return parsed
@@ -786,8 +798,6 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
         return OrderPlanResponse.model_validate(parsed)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=502, detail=f"OpenAI payload validation failed: {exc}") from exc
-
-
 def parse_timeframe(tf_str: str) -> TimeFrame:
     m = re.match(r'^(\d+)([A-Za-z]+)$', tf_str)
     if not m:
