@@ -770,8 +770,6 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
                     ],
                 },
             ],
-            temperature=0.2,
-            top_p=0.9,
             max_output_tokens=1100,
             text_format=OrderPlanResponse,
         )
