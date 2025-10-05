@@ -756,11 +756,13 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
     ).strip()
 
     payload_text = json.dumps(context, ensure_ascii=False)
+    schema_json = json.dumps(OrderPlanResponse.model_json_schema(), ensure_ascii=False)
 
     last_validation_error: ValidationError | None = None
     parsed: Any | None = None
     for attempt in range(2):
         user_content = [
+            {"type": "input_text", "text": "JSON schema (strict): " + schema_json},
             {"type": "input_text", "text": "Evaluate the proposed Alpaca orders and respond with the JSON schema."},
             {"type": "input_text", "text": payload_text},
         ]
