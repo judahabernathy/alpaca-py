@@ -761,11 +761,11 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
         parsed = await client.responses.parse(
             model=OPENAI_MODEL,
             input=[
-                {"role": "system", "content": [{"type": "text", "text": system_prompt}]},
+                {"role": "system", "content": [{"type": "input_text", "text": system_prompt}]},
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Evaluate the proposed Alpaca orders and respond with the JSON schema."},
+                        {"type": "input_text", "text": "Evaluate the proposed Alpaca orders and respond with the JSON schema."},
                         {"type": "input_text", "text": payload_text},
                     ],
                 },
