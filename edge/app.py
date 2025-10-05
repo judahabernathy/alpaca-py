@@ -4,20 +4,23 @@ import os
 import re
 import time
 from copy import deepcopy
+from functools import lru_cache
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast, Literal
 from uuid import uuid4
 from urllib.parse import urlparse, urlunparse
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi import FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.params import Param
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response, FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+
+from openai import APIConnectionError, APIStatusError, AsyncOpenAI, OpenAIError
 
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import (
@@ -53,7 +56,31 @@ EDGE_API_KEY = (
     or ""
 ).strip() or None
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL") or "gpt-5.1-mini"
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
+try:
+    OPENAI_TIMEOUT = float(os.getenv("OPENAI_TIMEOUT", "45"))
+except ValueError:
+    OPENAI_TIMEOUT = 45.0
+
 configure_logging()
+
+
+@lru_cache(maxsize=1)
+def _cached_openai_client(api_key: str, base_url: Optional[str], timeout: float) -> AsyncOpenAI:
+    headers = {"User-Agent": "alpaca-py/order-plan/1.0"}
+    return AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout, default_headers=headers)
+
+
+
+def _get_openai_client() -> AsyncOpenAI:
+    if not OPENAI_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OPENAI_API_KEY is not configured for this deployment.",
+        )
+    return _cached_openai_client(OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_TIMEOUT)
 
 
 @asynccontextmanager
@@ -417,6 +444,93 @@ def md_client() -> StockHistoricalDataClient:
         kwargs = {"api_key": api_key, "secret_key": secret_key}
     return StockHistoricalDataClient(**kwargs)
 
+class OrderIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    symbol: str = Field(..., min_length=1, max_length=12, description="Ticker symbol to trade.")
+    side: Literal["buy", "sell"] = Field(..., description="Order side.")
+    order_type: str = Field(..., min_length=2, max_length=24, description="Order type, e.g. market or limit.")
+    time_in_force: Optional[str] = Field(None, max_length=12, description="Time-in-force directive such as day or gtc.")
+    qty: Optional[float] = Field(None, ge=0, description="Quantity of shares to trade.")
+    notional: Optional[float] = Field(None, ge=0, description="Target notional in USD when quantity is omitted.")
+    limit_price: Optional[float] = Field(None, description="Limit price for limit or stop-limit orders.")
+    stop_price: Optional[float] = Field(None, description="Stop price for stop or stop-limit orders.")
+    trail_price: Optional[float] = Field(None, description="Trailing stop price.")
+    trail_percent: Optional[float] = Field(None, description="Trailing stop percentage.")
+    take_profit: Optional[Dict[str, Union[float, int, str]]] = Field(
+        None,
+        description="Optional take-profit leg details (e.g. limit_price).",
+    )
+    stop_loss: Optional[Dict[str, Union[float, int, str]]] = Field(
+        None,
+        description="Optional stop-loss leg details (e.g. stop_price).",
+    )
+    notes: Optional[str] = Field(
+        None,
+        max_length=400,
+        description="Additional human context about the order intent.",
+    )
+
+
+class OrderPlanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orders: List[OrderIntent] = Field(..., min_length=1, description="Orders to evaluate.")
+    include_account: bool = Field(True, description="Include Alpaca account snapshot in the analysis context.")
+    include_positions: bool = Field(True, description="Include open positions to highlight sizing overlaps.")
+    include_open_orders: bool = Field(False, description="Include currently open orders to detect duplicates.")
+    risk_notes: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="Additional risk or compliance constraints for the model to respect.",
+    )
+
+
+class OrderPlanAdjustment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    field: str = Field(..., description="Order field to adjust, e.g. limit_price.")
+    suggested_value: Optional[str] = Field(
+        None, description="Suggested replacement value, expressed as a string."
+    )
+    rationale: str = Field(..., description="Reason for adjusting this field.")
+
+
+class OrderPlanItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    symbol: str = Field(..., description="Symbol under review.")
+    side: Literal["buy", "sell"] = Field(..., description="Side of the proposed trade.")
+    status: Literal["approve", "revise", "reject"] = Field(
+        ..., description="High-level recommendation for the order."
+    )
+    summary: str = Field(..., description="Short natural-language summary of the guidance.")
+    reasoning: List[str] = Field(
+        default_factory=list, description="Key reasoning bullet points."
+    )
+    adjustments: List[OrderPlanAdjustment] = Field(
+        default_factory=list, description="Structured adjustments before execution."
+    )
+    risk_flags: List[str] = Field(
+        default_factory=list, description="Risks or guardrails to call out."
+    )
+
+
+class OrderPlanResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    execution_ready: bool = Field(..., description="Whether the orders can be sent as-is.")
+    plan_summary: str = Field(..., description="Overall synopsis of the execution plan.")
+    orders: List[OrderPlanItem] = Field(
+        default_factory=list, description="Per-order recommendations."
+    )
+    account_notes: List[str] = Field(
+        default_factory=list, description="Account-level callouts (margin, buying power, etc.)."
+    )
+    follow_up_tasks: List[str] = Field(
+        default_factory=list, description="Actionable next steps for the assistant or trader."
+    )
+
 class CreateOrder(BaseModel):
     symbol: str
     side: str
@@ -464,6 +578,216 @@ async def _submit_order_async(payload: Dict[str, Any]) -> Dict[str, Any]:
     if status >= 400:
         raise HTTPException(status_code=status, detail=body or "order rejected")
     return _decode_json(headers, body)
+
+
+def _simplify_account_payload(data: Any) -> Dict[str, Any]:
+    if not isinstance(data, dict):
+        return {}
+    keep = [
+        "status",
+        "equity",
+        "cash",
+        "portfolio_value",
+        "buying_power",
+        "multiplier",
+        "pattern_day_trader",
+        "shorting_enabled",
+        "daytrade_count",
+    ]
+    snapshot = {field: data.get(field) for field in keep if data.get(field) not in (None, "", [])}
+    if "cash" not in snapshot and data.get("cash_balance") not in (None, "", []):
+        snapshot["cash"] = data.get("cash_balance")
+    maintenance = data.get("maintenance_margin")
+    if maintenance not in (None, "", []):
+        snapshot.setdefault("maintenance_margin", maintenance)
+    return snapshot
+
+
+async def _fetch_account_snapshot() -> Dict[str, Any]:
+    try:
+        status, headers, body = await _request_with_retry(
+            _get_trading_http_client(),
+            "GET",
+            "/v2/account",
+        )
+    except HTTPException as exc:
+        return {"error": str(exc.detail), "status": exc.status_code}
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"error": f"account_request_failed: {exc}"}
+
+    if status >= 400:
+        return {"error": body or f"HTTP {status}", "status": status}
+
+    parsed = _decode_json(headers, body)
+    snapshot = _simplify_account_payload(parsed)
+    if snapshot:
+        return snapshot
+    return {"note": "account snapshot empty"}
+
+
+def _simplify_position(entry: Any) -> Dict[str, Any]:
+    if not isinstance(entry, dict):
+        return {}
+    keep = ["symbol", "qty", "avg_entry_price", "market_value", "side", "unrealized_pl", "unrealized_plpc"]
+    simplified = {field: entry.get(field) for field in keep if entry.get(field) not in (None, "", [])}
+    return simplified
+
+
+async def _fetch_positions_snapshot(limit: int = 10) -> Dict[str, Any]:
+    try:
+        status, headers, body = await _request_with_retry(
+            _get_trading_http_client(),
+            "GET",
+            "/v2/positions",
+        )
+    except HTTPException as exc:
+        return {"items": [], "error": str(exc.detail), "status": exc.status_code}
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"items": [], "error": f"positions_request_failed: {exc}"}
+
+    if status >= 400:
+        return {"items": [], "error": body or f"HTTP {status}", "status": status}
+
+    parsed = _decode_json(headers, body)
+    items: List[Dict[str, Any]] = []
+    if isinstance(parsed, list):
+        for entry in parsed[:limit]:
+            simplified = _simplify_position(entry)
+            if simplified:
+                items.append(simplified)
+    return {"items": items}
+
+
+def _simplify_open_order(entry: Any) -> Dict[str, Any]:
+    if not isinstance(entry, dict):
+        return {}
+    keep = ["id", "symbol", "side", "qty", "notional", "type", "time_in_force", "status", "limit_price", "stop_price", "submitted_at"]
+    simplified = {field: entry.get(field) for field in keep if entry.get(field) not in (None, "", [])}
+    legs = entry.get("legs")
+    if isinstance(legs, list):
+        leg_summaries = []
+        for leg in legs[:3]:
+            leg_summary = {
+                "symbol": leg.get("symbol"),
+                "side": leg.get("side"),
+                "qty": leg.get("qty"),
+                "type": leg.get("type"),
+                "limit_price": leg.get("limit_price"),
+                "status": leg.get("status"),
+            }
+            filtered_leg = {k: v for k, v in leg_summary.items() if v not in (None, "", [])}
+            if filtered_leg:
+                leg_summaries.append(filtered_leg)
+        if leg_summaries:
+            simplified["legs"] = leg_summaries
+    return simplified
+
+
+async def _fetch_open_orders_snapshot(limit: int = 10) -> Dict[str, Any]:
+    params = {"status": "open", "nested": "true"}
+    try:
+        status, headers, body = await _request_with_retry(
+            _get_trading_http_client(),
+            "GET",
+            "/v2/orders",
+            params=params,
+        )
+    except HTTPException as exc:
+        return {"items": [], "error": str(exc.detail), "status": exc.status_code}
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"items": [], "error": f"open_orders_request_failed: {exc}"}
+
+    if status >= 400:
+        return {"items": [], "error": body or f"HTTP {status}", "status": status}
+
+    parsed = _decode_json(headers, body)
+    items: List[Dict[str, Any]] = []
+    if isinstance(parsed, list):
+        for entry in parsed[:limit]:
+            simplified = _simplify_open_order(entry)
+            if simplified:
+                items.append(simplified)
+    return {"items": items}
+
+
+async def _collect_order_plan_context(payload: OrderPlanRequest) -> Dict[str, Any]:
+    context: Dict[str, Any] = {
+        "orders": [order.model_dump(exclude_none=True) for order in payload.orders],
+    }
+    if payload.risk_notes:
+        context["risk_notes"] = payload.risk_notes
+
+    tasks: List[asyncio.Task[Any]] = []
+    account_task = positions_task = open_orders_task = None
+
+    if payload.include_account:
+        account_task = asyncio.create_task(_fetch_account_snapshot())
+        tasks.append(account_task)
+    if payload.include_positions:
+        positions_task = asyncio.create_task(_fetch_positions_snapshot())
+        tasks.append(positions_task)
+    if payload.include_open_orders:
+        open_orders_task = asyncio.create_task(_fetch_open_orders_snapshot())
+        tasks.append(open_orders_task)
+
+    if tasks:
+        await asyncio.gather(*tasks)
+
+    if account_task:
+        context["account"] = account_task.result()
+    if positions_task:
+        context["positions"] = positions_task.result()
+    if open_orders_task:
+        context["open_orders"] = open_orders_task.result()
+
+    return context
+
+
+async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
+    client = _get_openai_client()
+    system_prompt = dedent(
+        """
+        You are a trading operations specialist assisting with Alpaca order intake.
+        Review the proposed orders, account snapshot, open positions, and any open orders.
+        Respond strictly with the provided JSON schema, focusing on compliance, sizing,
+        margin usage, and duplicate or conflicting orders. Keep reasoning concise and
+        guidance actionable.
+        """
+    ).strip()
+
+    payload_text = json.dumps(context, ensure_ascii=False)
+
+    try:
+        parsed = await client.responses.parse(
+            model=OPENAI_MODEL,
+            input=[
+                {"role": "system", "content": [{"type": "text", "text": system_prompt}]},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Evaluate the proposed Alpaca orders and respond with the JSON schema."},
+                        {"type": "input_text", "text": payload_text},
+                    ],
+                },
+            ],
+            temperature=0.2,
+            top_p=0.9,
+            max_output_tokens=1100,
+            response_format=OrderPlanResponse,
+        )
+    except APIConnectionError as exc:
+        raise HTTPException(status_code=502, detail=f"OpenAI connection error: {exc}") from exc
+    except APIStatusError as exc:
+        raise HTTPException(status_code=502, detail=f"OpenAI API error: {exc.status_code}") from exc
+    except OpenAIError as exc:
+        raise HTTPException(status_code=502, detail=f"OpenAI error: {exc}") from exc
+
+    if isinstance(parsed, OrderPlanResponse):
+        return parsed
+    try:
+        return OrderPlanResponse.model_validate(parsed)
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=502, detail=f"OpenAI payload validation failed: {exc}") from exc
 
 
 def parse_timeframe(tf_str: str) -> TimeFrame:
@@ -536,6 +860,19 @@ async def order_create(
     payload = _order_payload_from_model(order)
     return await _submit_order_async(payload)
 
+
+
+@app.post(
+    "/analysis/order-plan",
+    response_model=OrderPlanResponse,
+    summary="Review proposed Alpaca orders with GPT-5",
+    description="Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
+)
+async def analyse_order_plan(payload: OrderPlanRequest, request: Request) -> OrderPlanResponse:
+    _require_gateway_key_from_request(request)
+    context = await _collect_order_plan_context(payload)
+    result = await _call_order_plan_model(context)
+    return result
 
 
 @app.get("/v2/account")

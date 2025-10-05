@@ -25,6 +25,7 @@ websockets = ">=10.4"
 sseclient-py = "^1.7.2"
 aiohttp = "^3.9.3"
 python-dotenv = "^1.0.1"
+openai = ">=2.1.0"
 
 [tool.poetry.group.dev]
 optional = true
