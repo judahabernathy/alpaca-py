@@ -57,7 +57,7 @@ EDGE_API_KEY = (
 ).strip() or None
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL") or "gpt-5.1-mini"
+OPENAI_MODEL = os.getenv("OPENAI_MODEL") or "gpt-5-mini"
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 try:
     OPENAI_TIMEOUT = float(os.getenv("OPENAI_TIMEOUT", "45"))
@@ -773,7 +773,7 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
             temperature=0.2,
             top_p=0.9,
             max_output_tokens=1100,
-            response_format=OrderPlanResponse,
+            text_format=OrderPlanResponse,
         )
     except APIConnectionError as exc:
         raise HTTPException(status_code=502, detail=f"OpenAI connection error: {exc}") from exc
