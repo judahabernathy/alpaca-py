@@ -351,7 +351,7 @@ def _passthrough_json(status: int, headers: Dict[str, str], body: str) -> Respon
     response = Response(content=body or "", media_type=media_type, status_code=status)
     for name, value in headers.items():
         lower = name.lower()
-        if lower in {"content-length", "content-type"}:
+        if lower in {"content-length", "content-type", "content-encoding"}:
             continue
         response.headers.setdefault(name, value)
     return response
