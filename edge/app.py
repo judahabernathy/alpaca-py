@@ -1279,6 +1279,99 @@ def _build_openapi_schema(routes) -> Dict[str, Any]:
         order, include `limit_price`, and omit advanced `order_class` values.
         """
     ).strip()
+
+    order_response_schema = {
+        "type": "object",
+        "additionalProperties": True,
+        "required": ["id", "symbol", "status"],
+        "properties": {
+            "id": {
+                "type": "string",
+                "title": "Order ID",
+                "description": "Unique Alpaca order identifier.",
+            },
+            "client_order_id": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Client Order ID",
+            },
+            "symbol": {"type": "string", "title": "Symbol"},
+            "status": {
+                "type": "string",
+                "title": "Status",
+                "description": "Current order status reported by Alpaca.",
+            },
+            "side": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Side",
+            },
+            "type": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Type",
+            },
+            "order_class": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Order Class",
+            },
+            "time_in_force": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Time In Force",
+            },
+            "qty": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Qty",
+            },
+            "notional": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Notional",
+            },
+            "limit_price": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Limit Price",
+            },
+            "stop_price": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Stop Price",
+            },
+            "filled_qty": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Filled Qty",
+            },
+            "submitted_at": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Submitted At",
+            },
+            "updated_at": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "title": "Updated At",
+            },
+            "extended_hours": {
+                "anyOf": [{"type": "boolean"}, {"type": "null"}],
+                "title": "Extended Hours",
+            },
+            "legs": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {"type": "object", "additionalProperties": True},
+                    },
+                    {"type": "null"},
+                ],
+                "title": "Legs",
+            },
+        },
+    }
+
+    schemas = components.setdefault("schemas", {})
+    schemas["OrderResponse"] = order_response_schema
+
+    for path_key, method in (("/v2/orders", "post"), ("/v2/orders/sync", "post")):
+        try:
+            response = schema["paths"][path_key][method]["responses"]["200"]
+        except KeyError:
+            continue
+        content = response.setdefault("content", {}).setdefault("application/json", {})
+        content["schema"] = {"$ref": "#/components/schemas/OrderResponse"}
+
     return schema
 
 
