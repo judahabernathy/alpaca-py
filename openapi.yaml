@@ -12,6 +12,9 @@ info:
     When `extended_hours` is enabled the order payload must remain a DAY limit
 
     order, include `limit_price`, and omit advanced `order_class` values.'
+  license:
+    name: Proprietary
+    url: https://alpaca-py-production.up.railway.app/legal
 paths:
   /healthz:
     get:
@@ -22,8 +25,18 @@ paths:
           description: Successful Response
           content:
             application/json:
+              schema: {}
+        '429':
+          description: Rate limited
+          content:
+            application/json:
               schema:
-                $ref: '#/components/schemas/OrderResponse'
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: Explanation of the rate limit condition.
+                additionalProperties: true
   /v2/orders/sync:
     post:
       summary: Order Create Sync
@@ -53,6 +66,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/orders:
     get:
       summary: Orders List
@@ -63,6 +77,17 @@ paths:
           content:
             application/json:
               schema: {}
+        '401': &id001
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: Error message explaining why the request is unauthorized.
+                additionalProperties: true
     post:
       summary: Order Create
       description: 'Submit an order via Alpaca''s `/v2/orders`.
@@ -83,13 +108,15 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
         '422':
           description: Validation Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
     delete:
       summary: Orders Cancel All
       description: Cancel all open orders.
@@ -100,6 +127,8 @@ paths:
           content:
             application/json:
               schema: {}
+        '401': *id001
+      x-openai-isConsequential: true
   /analysis/order-plan:
     post:
       summary: Review proposed Alpaca orders with GPT-5
@@ -135,6 +164,7 @@ paths:
           content:
             application/json:
               schema: {}
+        '401': *id001
   /v2/account/activities:
     get:
       summary: Account Activities
@@ -254,6 +284,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/positions:
     get:
       summary: Positions List V2
@@ -264,6 +295,7 @@ paths:
           content:
             application/json:
               schema: {}
+        '401': *id001
     delete:
       summary: Positions Close All
       operationId: positions_close_all_v2_positions_delete
@@ -287,6 +319,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/positions/{symbol}:
     get:
       summary: Positions Get
@@ -339,6 +372,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/watchlists:
     get:
       summary: Watchlists List V2
@@ -349,6 +383,7 @@ paths:
           content:
             application/json:
               schema: {}
+        '401': *id001
     post:
       summary: Watchlists Create V2
       operationId: watchlists_create_v2_v2_watchlists_post
@@ -370,6 +405,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/watchlists/{watchlist_id}:
     get:
       summary: Watchlists Get V2
@@ -421,6 +457,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
     delete:
       summary: Watchlists Delete V2
       operationId: watchlists_delete_v2_v2_watchlists__watchlist_id__delete
@@ -443,6 +480,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/quotes:
     get:
       summary: Get Quotes V2
@@ -475,6 +513,7 @@ paths:
                 type: array
                 items:
                   type: object
+                  additionalProperties: true
                 title: Response Get Quotes V2 V2 Quotes Get
         '422':
           description: Validation Error
@@ -514,6 +553,7 @@ paths:
                 type: array
                 items:
                   type: object
+                  additionalProperties: true
                 title: Response Get Trades V2 V2 Trades Get
         '422':
           description: Validation Error
@@ -562,6 +602,7 @@ paths:
                 type: array
                 items:
                   type: object
+                  additionalProperties: true
                 title: Response Get Bars V2 V2 Bars Get
         '422':
           description: Validation Error
@@ -579,6 +620,9 @@ components:
         side:
           type: string
           title: Side
+          enum:
+          - buy
+          - sell
         qty:
           anyOf:
           - type: number
@@ -592,9 +636,22 @@ components:
         type:
           type: string
           title: Type
+          enum:
+          - market
+          - limit
+          - stop
+          - stop_limit
+          - trailing_stop
         time_in_force:
           type: string
           title: Time In Force
+          enum:
+          - day
+          - gtc
+          - opg
+          - cls
+          - ioc
+          - fok
         limit_price:
           anyOf:
           - type: number
@@ -608,16 +665,23 @@ components:
         order_class:
           anyOf:
           - type: string
+            enum:
+            - simple
+            - bracket
+            - oco
+            - oto
           - type: 'null'
           title: Order Class
         take_profit:
           anyOf:
           - type: object
+            additionalProperties: true
           - type: 'null'
           title: Take Profit
         stop_loss:
           anyOf:
           - type: object
+            additionalProperties: true
           - type: 'null'
           title: Stop Loss
         extended_hours:
@@ -647,6 +711,23 @@ components:
       - type
       - time_in_force
       title: CreateOrder
+      oneOf:
+      - required:
+        - qty
+        properties:
+          qty:
+            type: number
+        not:
+          required:
+          - notional
+      - required:
+        - notional
+        properties:
+          notional:
+            type: number
+        not:
+          required:
+          - qty
     HTTPValidationError:
       properties:
         detail:
@@ -758,99 +839,6 @@ components:
       - side
       - order_type
       title: OrderIntent
-
-    OrderResponse:
-      type: object
-      additionalProperties: true
-      required:
-      - id
-      - symbol
-      - status
-      properties:
-        id:
-          type: string
-          title: Order ID
-          description: Unique Alpaca order identifier.
-        client_order_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Client Order ID
-        symbol:
-          type: string
-          title: Symbol
-        status:
-          type: string
-          title: Status
-          description: Current order status reported by Alpaca.
-        side:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Side
-        type:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Type
-        order_class:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Order Class
-        time_in_force:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Time In Force
-        qty:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Qty
-        notional:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Notional
-        limit_price:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Limit Price
-        stop_price:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Stop Price
-        filled_qty:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Filled Qty
-        submitted_at:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Submitted At
-        updated_at:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Updated At
-        extended_hours:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Extended Hours
-        legs:
-          anyOf:
-          - items:
-              type: object
-              additionalProperties: true
-            type: array
-          - type: 'null'
-          title: Legs
     OrderPlanAdjustment:
       properties:
         field:
@@ -1031,11 +1019,104 @@ components:
       - name
       - symbols
       title: WatchlistIn
+    OrderResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - id
+      - symbol
+      - status
+      properties:
+        id:
+          type: string
+          title: Order ID
+          description: Unique Alpaca order identifier.
+        client_order_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Order ID
+        symbol:
+          type: string
+          title: Symbol
+        status:
+          type: string
+          title: Status
+          description: Current order status reported by Alpaca.
+        side:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Side
+        type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Type
+        order_class:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Order Class
+        time_in_force:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Time In Force
+        qty:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Qty
+        notional:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notional
+        limit_price:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Limit Price
+        stop_price:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Stop Price
+        filled_qty:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filled Qty
+        submitted_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Submitted At
+        updated_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated At
+        extended_hours:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Extended Hours
+        legs:
+          anyOf:
+          - type: array
+            items:
+              type: object
+              additionalProperties: true
+          - type: 'null'
+          title: Legs
   securitySchemes:
     EdgeApiKey:
       type: apiKey
       in: header
       name: X-API-Key
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 security:
 - EdgeApiKey: []
 servers:

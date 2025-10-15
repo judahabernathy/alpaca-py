@@ -1237,6 +1237,11 @@ def ai_plugin_manifest() -> FileResponse:
     raise HTTPException(status_code=404, detail="Manifest not found")
 
 
+@app.get("/.well-known/openapi.json", include_in_schema=False)
+def well_known_openapi() -> JSONResponse:
+    return JSONResponse(app.openapi())
+
+
 # --- ChatGPT plugin support ---
 
 cors_origins_env = os.getenv("EDGE_CORS_ALLOW_ORIGINS", "")
@@ -1264,21 +1269,55 @@ def _build_openapi_schema(routes) -> Dict[str, Any]:
         routes=routes,
     )
     schema["openapi"] = "3.1.0"
+    schema["jsonSchemaDialect"] = "https://json-schema.org/draft/2020-12/schema"
+
     components = schema.setdefault("components", {})
     security_schemes = components.setdefault("securitySchemes", {})
     security_schemes["EdgeApiKey"] = {"type": "apiKey", "in": "header", "name": "X-API-Key"}
+    for deprecated_scheme in ("ApiKeyAuth", "alpacaKey", "alpacaSecret"):
+        security_schemes.pop(deprecated_scheme, None)
     schema["security"] = [{"EdgeApiKey": []}]
 
     info = schema.setdefault("info", {})
-    info["description"] = dedent(
-        """
+    info["description"] = dedent("""
         All endpoints require the `X-API-Key` header; the `api_key` query parameter is
         supported as a compatibility fallback. The service propagates Alpaca's rate
         limits as HTTP 429 responses and surfaces the upstream `Retry-After` header.
         When `extended_hours` is enabled the order payload must remain a DAY limit
         order, include `limit_price`, and omit advanced `order_class` values.
-        """
-    ).strip()
+    """).strip()
+
+    info.setdefault("license", {"name": "Proprietary", "url": "https://alpaca-py-production.up.railway.app/legal"})
+
+    paths = schema.setdefault("paths", {})
+    for path_item in paths.values():
+        for operation in path_item.values():
+            if not isinstance(operation, dict):
+                continue
+            parameters = operation.get("parameters")
+            if not parameters:
+                continue
+            filtered = [param for param in parameters if param.get("name") != "X-API-Key"]
+            if filtered:
+                operation["parameters"] = filtered
+            else:
+                operation.pop("parameters", None)
+
+    consequential_operations = {
+        ("/v2/orders", "post"),
+        ("/v2/orders/sync", "post"),
+        ("/v2/orders", "delete"),
+        ("/v2/orders/{order_id}", "delete"),
+        ("/v2/positions", "delete"),
+        ("/v2/positions/{symbol}", "delete"),
+        ("/v2/watchlists", "post"),
+        ("/v2/watchlists/{watchlist_id}", "put"),
+        ("/v2/watchlists/{watchlist_id}", "delete"),
+    }
+    for path, method in consequential_operations:
+        operation = paths.get(path, {}).get(method)
+        if isinstance(operation, dict):
+            operation["x-openai-isConsequential"] = True
 
     order_response_schema = {
         "type": "object",
@@ -1364,16 +1403,147 @@ def _build_openapi_schema(routes) -> Dict[str, Any]:
     schemas = components.setdefault("schemas", {})
     schemas["OrderResponse"] = order_response_schema
 
-    for path_key, method in (("/v2/orders", "post"), ("/v2/orders/sync", "post")):
-        try:
-            response = schema["paths"][path_key][method]["responses"]["200"]
-        except KeyError:
+    for path, method in (("/v2/orders", "post"), ("/v2/orders/sync", "post")):
+        response = paths.get(path, {}).get(method, {}).get("responses", {}).get("200")
+        if not isinstance(response, dict):
             continue
         content = response.setdefault("content", {}).setdefault("application/json", {})
         content["schema"] = {"$ref": "#/components/schemas/OrderResponse"}
 
-    return schema
+    array_response_paths = (
+        ("/v2/bars", "get"),
+        ("/v2/trades", "get"),
+        ("/v2/quotes", "get"),
+    )
+    for path_key, http_method in array_response_paths:
+        array_schema = (
+            paths
+            .get(path_key, {})
+            .get(http_method, {})
+            .get("responses", {})
+            .get("200", {})
+            .get("content", {})
+            .get("application/json", {})
+            .get("schema")
+        )
+        if isinstance(array_schema, dict):
+            items = array_schema.get("items")
+            if isinstance(items, dict) and items.get("type") == "object":
+                items.setdefault("additionalProperties", True)
 
+    create_order_schema = schemas.get("CreateOrder")
+
+    unauthorized_response = {
+        "description": "Unauthorized",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "detail": {
+                            "type": "string",
+                            "description": "Error message explaining why the request is unauthorized."
+                        }
+                    },
+                    "additionalProperties": True,
+                }
+            }
+        },
+    }
+
+    rate_limited_response = {
+        "description": "Rate limited",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "detail": {
+                            "type": "string",
+                            "description": "Explanation of the rate limit condition."
+                        }
+                    },
+                    "additionalProperties": True,
+                }
+            }
+        },
+    }
+
+    four_xx_responses = {
+        ("/healthz", "get"): {"429": rate_limited_response},
+        ("/v2/orders", "get"): {"401": unauthorized_response},
+        ("/v2/orders", "delete"): {"401": unauthorized_response},
+        ("/v2/account", "get"): {"401": unauthorized_response},
+        ("/v2/positions", "get"): {"401": unauthorized_response},
+        ("/v2/watchlists", "get"): {"401": unauthorized_response},
+    }
+
+    for (path_key, http_method), extra_responses in four_xx_responses.items():
+        operation = paths.get(path_key, {}).get(http_method)
+        if not isinstance(operation, dict):
+            continue
+        responses = operation.setdefault("responses", {})
+        for status_code, response_payload in extra_responses.items():
+            responses.setdefault(status_code, response_payload)
+
+    create_order_schema = schemas.get("CreateOrder")
+    if isinstance(create_order_schema, dict):
+        create_props = create_order_schema.setdefault("properties", {})
+
+        side = create_props.get("side")
+        if isinstance(side, dict):
+            side["enum"] = ["buy", "sell"]
+
+        order_type = create_props.get("type")
+        if isinstance(order_type, dict):
+            order_type["enum"] = [
+                "market",
+                "limit",
+                "stop",
+                "stop_limit",
+                "trailing_stop",
+            ]
+
+        time_in_force = create_props.get("time_in_force")
+        if isinstance(time_in_force, dict):
+            time_in_force["enum"] = ["day", "gtc", "opg", "cls", "ioc", "fok"]
+
+        order_class = create_props.get("order_class")
+        order_class_enum = ["simple", "bracket", "oco", "oto"]
+        if isinstance(order_class, dict):
+            any_of = order_class.get("anyOf")
+            if isinstance(any_of, list):
+                for branch in any_of:
+                    if isinstance(branch, dict) and branch.get("type") == "string":
+                        branch["enum"] = order_class_enum
+            else:
+                order_class["enum"] = order_class_enum
+
+        take_stop_keys = ("take_profit", "stop_loss")
+        for key in take_stop_keys:
+            prop = create_props.get(key)
+            if not isinstance(prop, dict):
+                continue
+            any_of = prop.get("anyOf")
+            if isinstance(any_of, list):
+                for branch in any_of:
+                    if isinstance(branch, dict) and branch.get("type") == "object":
+                        branch.setdefault("additionalProperties", True)
+
+        create_order_schema["oneOf"] = [
+            {
+                "required": ["qty"],
+                "properties": {"qty": {"type": "number"}},
+                "not": {"required": ["notional"]},
+            },
+            {
+                "required": ["notional"],
+                "properties": {"notional": {"type": "number"}},
+                "not": {"required": ["qty"]},
+            },
+        ]
+
+    return schema
 
 
 def _custom_openapi():

@@ -3,7 +3,11 @@
   "info": {
     "title": "Alpaca Wrapper",
     "version": "1.1.0",
-    "description": "All endpoints require the `X-API-Key` header; the `api_key` query parameter is\nsupported as a compatibility fallback. The service propagates Alpaca's rate\nlimits as HTTP 429 responses and surfaces the upstream `Retry-After` header.\nWhen `extended_hours` is enabled the order payload must remain a DAY limit\norder, include `limit_price`, and omit advanced `order_class` values."
+    "description": "All endpoints require the `X-API-Key` header; the `api_key` query parameter is\nsupported as a compatibility fallback. The service propagates Alpaca's rate\nlimits as HTTP 429 responses and surfaces the upstream `Retry-After` header.\nWhen `extended_hours` is enabled the order payload must remain a DAY limit\norder, include `limit_price`, and omit advanced `order_class` values.",
+    "license": {
+      "name": "Proprietary",
+      "url": "https://alpaca-py-production.up.railway.app/legal"
+    }
   },
   "paths": {
     "/healthz": {
@@ -16,6 +20,23 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Explanation of the rate limit condition."
+                    }
+                  },
+                  "additionalProperties": true
+                }
               }
             }
           }
@@ -42,7 +63,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
               }
             }
           },
@@ -56,7 +79,8 @@
               }
             }
           }
-        }
+        },
+        "x-openai-isConsequential": true
       }
     },
     "/v2/orders": {
@@ -69,6 +93,23 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
               }
             }
           }
@@ -93,7 +134,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
               }
             }
           },
@@ -107,7 +150,8 @@
               }
             }
           }
-        }
+        },
+        "x-openai-isConsequential": true
       },
       "delete": {
         "summary": "Orders Cancel All",
@@ -121,8 +165,26 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
           }
-        }
+        },
+        "x-openai-isConsequential": true
       }
     },
     "/analysis/order-plan": {
@@ -174,6 +236,23 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
               }
             }
           }
@@ -390,7 +469,8 @@
               }
             }
           }
-        }
+        },
+        "x-openai-isConsequential": true
       }
     },
     "/v2/positions": {
@@ -403,6 +483,23 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
               }
             }
           }
@@ -442,7 +539,8 @@
               }
             }
           }
-        }
+        },
+        "x-openai-isConsequential": true
       }
     },
     "/v2/positions/{symbol}": {
@@ -524,7 +622,8 @@
               }
             }
           }
-        }
+        },
+        "x-openai-isConsequential": true
       }
     },
     "/v2/watchlists": {
@@ -537,6 +636,23 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
               }
             }
           }
@@ -574,7 +690,8 @@
               }
             }
           }
-        }
+        },
+        "x-openai-isConsequential": true
       }
     },
     "/v2/watchlists/{watchlist_id}": {
@@ -656,7 +773,8 @@
               }
             }
           }
-        }
+        },
+        "x-openai-isConsequential": true
       },
       "delete": {
         "summary": "Watchlists Delete V2",
@@ -691,7 +809,8 @@
               }
             }
           }
-        }
+        },
+        "x-openai-isConsequential": true
       }
     },
     "/v2/quotes": {
@@ -735,7 +854,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object"
+                    "type": "object",
+                    "additionalProperties": true
                   },
                   "title": "Response Get Quotes V2 V2 Quotes Get"
                 }
@@ -796,7 +916,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object"
+                    "type": "object",
+                    "additionalProperties": true
                   },
                   "title": "Response Get Trades V2 V2 Trades Get"
                 }
@@ -874,7 +995,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object"
+                    "type": "object",
+                    "additionalProperties": true
                   },
                   "title": "Response Get Bars V2 V2 Bars Get"
                 }
@@ -905,7 +1027,11 @@
           },
           "side": {
             "type": "string",
-            "title": "Side"
+            "title": "Side",
+            "enum": [
+              "buy",
+              "sell"
+            ]
           },
           "qty": {
             "anyOf": [
@@ -931,11 +1057,26 @@
           },
           "type": {
             "type": "string",
-            "title": "Type"
+            "title": "Type",
+            "enum": [
+              "market",
+              "limit",
+              "stop",
+              "stop_limit",
+              "trailing_stop"
+            ]
           },
           "time_in_force": {
             "type": "string",
-            "title": "Time In Force"
+            "title": "Time In Force",
+            "enum": [
+              "day",
+              "gtc",
+              "opg",
+              "cls",
+              "ioc",
+              "fok"
+            ]
           },
           "limit_price": {
             "anyOf": [
@@ -962,7 +1103,13 @@
           "order_class": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "simple",
+                  "bracket",
+                  "oco",
+                  "oto"
+                ]
               },
               {
                 "type": "null"
@@ -973,7 +1120,8 @@
           "take_profit": {
             "anyOf": [
               {
-                "type": "object"
+                "type": "object",
+                "additionalProperties": true
               },
               {
                 "type": "null"
@@ -984,7 +1132,8 @@
           "stop_loss": {
             "anyOf": [
               {
-                "type": "object"
+                "type": "object",
+                "additionalProperties": true
               },
               {
                 "type": "null"
@@ -1044,7 +1193,39 @@
           "type",
           "time_in_force"
         ],
-        "title": "CreateOrder"
+        "title": "CreateOrder",
+        "oneOf": [
+          {
+            "required": [
+              "qty"
+            ],
+            "properties": {
+              "qty": {
+                "type": "number"
+              }
+            },
+            "not": {
+              "required": [
+                "notional"
+              ]
+            }
+          },
+          {
+            "required": [
+              "notional"
+            ],
+            "properties": {
+              "notional": {
+                "type": "number"
+              }
+            },
+            "not": {
+              "required": [
+                "qty"
+              ]
+            }
+          }
+        ]
       },
       "HTTPValidationError": {
         "properties": {
@@ -1491,6 +1672,189 @@
           "symbols"
         ],
         "title": "WatchlistIn"
+      },
+      "OrderResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "symbol",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Order ID",
+            "description": "Unique Alpaca order identifier."
+          },
+          "client_order_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Order ID"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Current order status reported by Alpaca."
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "order_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Class"
+          },
+          "time_in_force": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time In Force"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "notional": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notional"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price"
+          },
+          "filled_qty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filled Qty"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "extended_hours": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extended Hours"
+          },
+          "legs": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legs"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -1501,6 +1865,7 @@
       }
     }
   },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "security": [
     {
       "EdgeApiKey": []

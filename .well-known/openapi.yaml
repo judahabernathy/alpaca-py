@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Alpaca Wrapper
-  version: 1.0.0
+  version: 1.1.0
   description: 'All endpoints require the `X-API-Key` header; the `api_key` query
     parameter is
 
@@ -12,6 +12,9 @@ info:
     When `extended_hours` is enabled the order payload must remain a DAY limit
 
     order, include `limit_price`, and omit advanced `order_class` values.'
+  license:
+    name: Proprietary
+    url: https://alpaca-py-production.up.railway.app/legal
 paths:
   /healthz:
     get:
@@ -23,39 +26,17 @@ paths:
           content:
             application/json:
               schema: {}
-  /readyz:
-    get:
-      summary: Readyz
-      description: Readiness probe that verifies upstream dependencies.
-      operationId: readyz_readyz_get
-      parameters:
-      - name: detail
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: false
-          title: Detail
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+        '429':
+          description: Rate limited
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: Explanation of the rate limit condition.
+                additionalProperties: true
   /v2/orders/sync:
     post:
       summary: Order Create Sync
@@ -66,126 +47,107 @@ paths:
 
         and surfaces upstream HTTP 429 responses with their `Retry-After`.'
       operationId: order_create_sync_v2_orders_sync_post
-      parameters:
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateOrder'
+        required: true
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
         '422':
           description: Validation Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/orders:
-    post:
-      summary: Order Create
-      description: "Submit an order via Alpaca's `/v2/orders`. \n\nRequires `X-API-Key`,\
-        \ forwards 429 responses with `Retry-After`, and\napplies the limit guard\
-        \ (extended-hours must be DAY limit orders)."
-      operationId: order_create_v2_orders_post
-      parameters:
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateOrder'
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
     get:
       summary: Orders List
       operationId: orders_list_v2_orders_get
-      parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Status
-      - name: symbols
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Symbols
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema: {}
+        '401': &id001
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: Error message explaining why the request is unauthorized.
+                additionalProperties: true
+    post:
+      summary: Order Create
+      description: 'Submit an order via Alpaca''s `/v2/orders`.
+
+
+        Requires `X-API-Key`, forwards 429 responses with `Retry-After`, and
+
+        applies the limit guard (extended-hours must be DAY limit orders).'
+      operationId: order_create_v2_orders_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrder'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
         '422':
           description: Validation Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
     delete:
       summary: Orders Cancel All
       description: Cancel all open orders.
       operationId: orders_cancel_all_v2_orders_delete
-      parameters:
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema: {}
+        '401': *id001
+      x-openai-isConsequential: true
+  /analysis/order-plan:
+    post:
+      summary: Review proposed Alpaca orders with GPT-5
+      description: Use GPT-5 Structured Output to review proposed orders and return
+        a JSON execution plan with adjustments and risk notes.
+      operationId: analyse_order_plan_analysis_order_plan_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderPlanRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPlanResponse'
         '422':
           description: Validation Error
           content:
@@ -196,27 +158,13 @@ paths:
     get:
       summary: Account Get
       operationId: account_get_v2_account_get
-      parameters:
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema: {}
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+        '401': *id001
   /v2/account/activities:
     get:
       summary: Account Activities
@@ -278,14 +226,6 @@ paths:
           - type: string
           - type: 'null'
           title: Page Token
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -309,14 +249,6 @@ paths:
         schema:
           type: string
           title: Order Id
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -340,14 +272,6 @@ paths:
         schema:
           type: string
           title: Order Id
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -360,31 +284,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/positions:
     get:
       summary: Positions List V2
       operationId: positions_list_v2_v2_positions_get
-      parameters:
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema: {}
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+        '401': *id001
     delete:
       summary: Positions Close All
       operationId: positions_close_all_v2_positions_delete
@@ -396,14 +307,6 @@ paths:
           type: boolean
           default: false
           title: Cancel Orders
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -416,6 +319,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/positions/{symbol}:
     get:
       summary: Positions Get
@@ -427,14 +331,6 @@ paths:
         schema:
           type: string
           title: Symbol
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -464,14 +360,6 @@ paths:
           type: boolean
           default: false
           title: Cancel Orders
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -484,49 +372,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/watchlists:
     get:
       summary: Watchlists List V2
       operationId: watchlists_list_v2_v2_watchlists_get
-      parameters:
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema: {}
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+        '401': *id001
     post:
       summary: Watchlists Create V2
       operationId: watchlists_create_v2_v2_watchlists_post
-      parameters:
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/WatchlistIn'
+        required: true
       responses:
         '200':
           description: Successful Response
@@ -539,6 +405,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/watchlists/{watchlist_id}:
     get:
       summary: Watchlists Get V2
@@ -550,14 +417,6 @@ paths:
         schema:
           type: string
           title: Watchlist Id
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -580,14 +439,6 @@ paths:
         schema:
           type: string
           title: Watchlist Id
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       requestBody:
         required: true
         content:
@@ -606,6 +457,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
     delete:
       summary: Watchlists Delete V2
       operationId: watchlists_delete_v2_v2_watchlists__watchlist_id__delete
@@ -616,14 +468,6 @@ paths:
         schema:
           type: string
           title: Watchlist Id
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -636,6 +480,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      x-openai-isConsequential: true
   /v2/quotes:
     get:
       summary: Get Quotes V2
@@ -659,14 +504,6 @@ paths:
         schema:
           type: string
           title: End
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -676,6 +513,7 @@ paths:
                 type: array
                 items:
                   type: object
+                  additionalProperties: true
                 title: Response Get Quotes V2 V2 Quotes Get
         '422':
           description: Validation Error
@@ -706,14 +544,6 @@ paths:
         schema:
           type: string
           title: End
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -723,6 +553,7 @@ paths:
                 type: array
                 items:
                   type: object
+                  additionalProperties: true
                 title: Response Get Trades V2 V2 Trades Get
         '422':
           description: Validation Error
@@ -762,14 +593,6 @@ paths:
           - type: string
           - type: 'null'
           title: End
-      - name: X-API-Key
-        in: header
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: X-Api-Key
       responses:
         '200':
           description: Successful Response
@@ -779,6 +602,7 @@ paths:
                 type: array
                 items:
                   type: object
+                  additionalProperties: true
                 title: Response Get Bars V2 V2 Bars Get
         '422':
           description: Validation Error
@@ -796,6 +620,9 @@ components:
         side:
           type: string
           title: Side
+          enum:
+          - buy
+          - sell
         qty:
           anyOf:
           - type: number
@@ -809,9 +636,22 @@ components:
         type:
           type: string
           title: Type
+          enum:
+          - market
+          - limit
+          - stop
+          - stop_limit
+          - trailing_stop
         time_in_force:
           type: string
           title: Time In Force
+          enum:
+          - day
+          - gtc
+          - opg
+          - cls
+          - ioc
+          - fok
         limit_price:
           anyOf:
           - type: number
@@ -825,16 +665,23 @@ components:
         order_class:
           anyOf:
           - type: string
+            enum:
+            - simple
+            - bracket
+            - oco
+            - oto
           - type: 'null'
           title: Order Class
         take_profit:
           anyOf:
           - type: object
+            additionalProperties: true
           - type: 'null'
           title: Take Profit
         stop_loss:
           anyOf:
           - type: object
+            additionalProperties: true
           - type: 'null'
           title: Stop Loss
         extended_hours:
@@ -864,6 +711,23 @@ components:
       - type
       - time_in_force
       title: CreateOrder
+      oneOf:
+      - required:
+        - qty
+        properties:
+          qty:
+            type: number
+        not:
+          required:
+          - notional
+      - required:
+        - notional
+        properties:
+          notional:
+            type: number
+        not:
+          required:
+          - qty
     HTTPValidationError:
       properties:
         detail:
@@ -873,6 +737,252 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
+    OrderIntent:
+      properties:
+        symbol:
+          type: string
+          maxLength: 12
+          minLength: 1
+          title: Symbol
+          description: Ticker symbol to trade.
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+          title: Side
+          description: Order side.
+        order_type:
+          type: string
+          maxLength: 24
+          minLength: 2
+          title: Order Type
+          description: Order type, e.g. market or limit.
+        time_in_force:
+          anyOf:
+          - type: string
+            maxLength: 12
+          - type: 'null'
+          title: Time In Force
+          description: Time-in-force directive such as day or gtc.
+        qty:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+          title: Qty
+          description: Quantity of shares to trade.
+        notional:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: 'null'
+          title: Notional
+          description: Target notional in USD when quantity is omitted.
+        limit_price:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Limit Price
+          description: Limit price for limit or stop-limit orders.
+        stop_price:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Stop Price
+          description: Stop price for stop or stop-limit orders.
+        trail_price:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Trail Price
+          description: Trailing stop price.
+        trail_percent:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Trail Percent
+          description: Trailing stop percentage.
+        take_profit:
+          anyOf:
+          - additionalProperties:
+              anyOf:
+              - type: number
+              - type: integer
+              - type: string
+            type: object
+          - type: 'null'
+          title: Take Profit
+          description: Optional take-profit leg details (e.g. limit_price).
+        stop_loss:
+          anyOf:
+          - additionalProperties:
+              anyOf:
+              - type: number
+              - type: integer
+              - type: string
+            type: object
+          - type: 'null'
+          title: Stop Loss
+          description: Optional stop-loss leg details (e.g. stop_price).
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 400
+          - type: 'null'
+          title: Notes
+          description: Additional human context about the order intent.
+      additionalProperties: false
+      type: object
+      required:
+      - symbol
+      - side
+      - order_type
+      title: OrderIntent
+    OrderPlanAdjustment:
+      properties:
+        field:
+          type: string
+          title: Field
+          description: Order field to adjust, e.g. limit_price.
+        suggested_value:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Suggested Value
+          description: Suggested replacement value, expressed as a string.
+        rationale:
+          type: string
+          title: Rationale
+          description: Reason for adjusting this field.
+      additionalProperties: false
+      type: object
+      required:
+      - field
+      - rationale
+      title: OrderPlanAdjustment
+    OrderPlanItem:
+      properties:
+        symbol:
+          type: string
+          title: Symbol
+          description: Symbol under review.
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+          title: Side
+          description: Side of the proposed trade.
+        status:
+          type: string
+          enum:
+          - approve
+          - revise
+          - reject
+          title: Status
+          description: High-level recommendation for the order.
+        summary:
+          type: string
+          title: Summary
+          description: Short natural-language summary of the guidance.
+        reasoning:
+          items:
+            type: string
+          type: array
+          title: Reasoning
+          description: Key reasoning bullet points.
+        adjustments:
+          items:
+            $ref: '#/components/schemas/OrderPlanAdjustment'
+          type: array
+          title: Adjustments
+          description: Structured adjustments before execution.
+        risk_flags:
+          items:
+            type: string
+          type: array
+          title: Risk Flags
+          description: Risks or guardrails to call out.
+      additionalProperties: false
+      type: object
+      required:
+      - symbol
+      - side
+      - status
+      - summary
+      title: OrderPlanItem
+    OrderPlanRequest:
+      properties:
+        orders:
+          items:
+            $ref: '#/components/schemas/OrderIntent'
+          type: array
+          minItems: 1
+          title: Orders
+          description: Orders to evaluate.
+        include_account:
+          type: boolean
+          title: Include Account
+          description: Include Alpaca account snapshot in the analysis context.
+          default: true
+        include_positions:
+          type: boolean
+          title: Include Positions
+          description: Include open positions to highlight sizing overlaps.
+          default: true
+        include_open_orders:
+          type: boolean
+          title: Include Open Orders
+          description: Include currently open orders to detect duplicates.
+          default: false
+        risk_notes:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Risk Notes
+          description: Additional risk or compliance constraints for the model to
+            respect.
+      additionalProperties: false
+      type: object
+      required:
+      - orders
+      title: OrderPlanRequest
+    OrderPlanResponse:
+      properties:
+        execution_ready:
+          type: boolean
+          title: Execution Ready
+          description: Whether the orders can be sent as-is.
+        plan_summary:
+          type: string
+          title: Plan Summary
+          description: Overall synopsis of the execution plan.
+        orders:
+          items:
+            $ref: '#/components/schemas/OrderPlanItem'
+          type: array
+          title: Orders
+          description: Per-order recommendations.
+        account_notes:
+          items:
+            type: string
+          type: array
+          title: Account Notes
+          description: Account-level callouts (margin, buying power, etc.).
+        follow_up_tasks:
+          items:
+            type: string
+          type: array
+          title: Follow Up Tasks
+          description: Actionable next steps for the assistant or trader.
+      additionalProperties: false
+      type: object
+      required:
+      - execution_ready
+      - plan_summary
+      title: OrderPlanResponse
     ValidationError:
       properties:
         loc:
@@ -909,12 +1019,105 @@ components:
       - name
       - symbols
       title: WatchlistIn
+    OrderResponse:
+      type: object
+      additionalProperties: true
+      required:
+      - id
+      - symbol
+      - status
+      properties:
+        id:
+          type: string
+          title: Order ID
+          description: Unique Alpaca order identifier.
+        client_order_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Client Order ID
+        symbol:
+          type: string
+          title: Symbol
+        status:
+          type: string
+          title: Status
+          description: Current order status reported by Alpaca.
+        side:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Side
+        type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Type
+        order_class:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Order Class
+        time_in_force:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Time In Force
+        qty:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Qty
+        notional:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notional
+        limit_price:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Limit Price
+        stop_price:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Stop Price
+        filled_qty:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Filled Qty
+        submitted_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Submitted At
+        updated_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updated At
+        extended_hours:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Extended Hours
+        legs:
+          anyOf:
+          - type: array
+            items:
+              type: object
+              additionalProperties: true
+          - type: 'null'
+          title: Legs
   securitySchemes:
     EdgeApiKey:
       type: apiKey
       in: header
       name: X-API-Key
-servers:
-- url: https://alpaca-py-production.up.railway.app
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 security:
 - EdgeApiKey: []
+servers:
+- url: https://alpaca-py-production.up.railway.app
