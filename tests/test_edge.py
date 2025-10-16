@@ -757,6 +757,98 @@ def test_prepare_order_payload_inserts_id(monkeypatch):
     assert result["client_order_id"] == "generated"
 
 
+def test_prepare_order_payload_removes_redundant_stop(monkeypatch):
+
+    monkeypatch.setattr(app, "_enforce_ext_policy", lambda payload: payload)
+    monkeypatch.setattr(app, "_resolve_client_order_id", lambda cid: cid or "generated")
+
+    payload = {
+        "symbol": "AAPL",
+        "type": "limit",
+        "time_in_force": "day",
+        "order_class": "bracket",
+        "stop_price": 225.0,
+        "take_profit": {"limit_price": 230.0},
+        "stop_loss": {"stop_price": 225.0, "limit_price": 224.0},
+        "client_order_id": "existing-cid",
+    }
+    result = app._prepare_order_payload(payload)
+
+    assert "stop_price" not in result
+    assert result["stop_loss"] == {"stop_price": 225.0, "limit_price": 224.0}
+    assert result["take_profit"] == {"limit_price": 230.0}
+    assert result["client_order_id"] == "existing-cid"
+
+
+def test_prepare_order_payload_drops_trailing_fields(monkeypatch):
+
+    monkeypatch.setattr(app, "_enforce_ext_policy", lambda payload: payload)
+    monkeypatch.setattr(app, "_resolve_client_order_id", lambda cid: cid or "generated")
+
+    payload = {
+        "symbol": "AAPL",
+        "type": "limit",
+        "time_in_force": "day",
+        "trail_price": 1.5,
+        "trail_percent": 0,
+    }
+    result = app._prepare_order_payload(payload)
+
+    assert "trail_price" not in result
+    assert "trail_percent" not in result
+
+
+def test_prepare_order_payload_keeps_trailing_fields_for_trailing_stop(monkeypatch):
+
+    monkeypatch.setattr(app, "_enforce_ext_policy", lambda payload: payload)
+    monkeypatch.setattr(app, "_resolve_client_order_id", lambda cid: cid or "generated")
+
+    payload = {
+        "symbol": "AAPL",
+        "type": "trailing_stop",
+        "time_in_force": "day",
+        "trail_percent": 2.0,
+    }
+    result = app._prepare_order_payload(payload)
+
+    assert result["trail_percent"] == 2.0
+    assert "trail_price" not in result
+
+
+def test_prepare_order_payload_prunes_stop_loss_none_values(monkeypatch):
+
+    monkeypatch.setattr(app, "_enforce_ext_policy", lambda payload: payload)
+    monkeypatch.setattr(app, "_resolve_client_order_id", lambda cid: cid or "generated")
+
+    payload = {
+        "symbol": "AAPL",
+        "type": "market",
+        "time_in_force": "day",
+        "stop_price": 200.0,
+        "stop_loss": {"stop_price": 200.0, "limit_price": None},
+    }
+    result = app._prepare_order_payload(payload)
+
+    assert result["stop_loss"] == {"stop_price": 200.0}
+    assert "stop_price" not in result
+
+
+def test_prepare_order_payload_keeps_stop_price_for_stop_orders(monkeypatch):
+
+    monkeypatch.setattr(app, "_enforce_ext_policy", lambda payload: payload)
+    monkeypatch.setattr(app, "_resolve_client_order_id", lambda cid: cid or "generated")
+
+    payload = {
+        "symbol": "AAPL",
+        "type": "stop",
+        "time_in_force": "day",
+        "stop_price": 205.5,
+    }
+    result = app._prepare_order_payload(payload)
+
+    assert result["stop_price"] == 205.5
+
+
 @pytest.mark.asyncio
 async def test_submit_order_async_success(monkeypatch):
     monkeypatch.setattr(app, "_prepare_order_payload", lambda payload: payload)

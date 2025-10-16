@@ -18,6 +18,7 @@ from fastapi.params import Param
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response, FileResponse
+import anyio
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from openai import APIConnectionError, APIStatusError, AsyncOpenAI, OpenAIError
@@ -444,6 +445,32 @@ def md_client() -> StockHistoricalDataClient:
         kwargs = {"api_key": api_key, "secret_key": secret_key}
     return StockHistoricalDataClient(**kwargs)
 
+
+
+class TakeProfitLeg(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    limit_price: float = Field(
+        ...,
+        description="Limit price for the take-profit child leg.",
+    )
+
+
+class StopLossLeg(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stop_price: float = Field(
+        ...,
+        description="Trigger price for the stop-loss child leg (e.g., 225.0).",
+    )
+    limit_price: Optional[float] = Field(
+        None,
+        description=(
+            "Optional limit price for a stop-limit child leg. "
+            "Omit to use a market stop; set slightly below the stop (e.g., 224.0) when a limit is required."
+        ),
+    )
+
 class OrderIntent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -454,16 +481,16 @@ class OrderIntent(BaseModel):
     qty: Optional[float] = Field(None, ge=0, description="Quantity of shares to trade.")
     notional: Optional[float] = Field(None, ge=0, description="Target notional in USD when quantity is omitted.")
     limit_price: Optional[float] = Field(None, description="Limit price for limit or stop-limit orders.")
-    stop_price: Optional[float] = Field(None, description="Stop price for stop or stop-limit orders.")
-    trail_price: Optional[float] = Field(None, description="Trailing stop price.")
-    trail_percent: Optional[float] = Field(None, description="Trailing stop percentage.")
-    take_profit: Optional[Dict[str, Union[float, int, str]]] = Field(
+    stop_price: Optional[float] = Field(None, description="Top-level stop price for standalone stop or stop-limit orders.")
+    trail_price: Optional[float] = Field(None, description="Trailing stop price (ignored unless type is trailing_stop).")
+    trail_percent: Optional[float] = Field(None, description="Trailing stop percentage (ignored unless type is trailing_stop).")
+    take_profit: Optional[TakeProfitLeg] = Field(
         None,
-        description="Optional take-profit leg details (e.g. limit_price).",
+        description="Optional take-profit child order details.",
     )
-    stop_loss: Optional[Dict[str, Union[float, int, str]]] = Field(
+    stop_loss: Optional[StopLossLeg] = Field(
         None,
-        description="Optional stop-loss leg details (e.g. stop_price).",
+        description="Optional stop-loss child order details.",
     )
     notes: Optional[str] = Field(
         None,
@@ -532,6 +559,8 @@ class OrderPlanResponse(BaseModel):
     )
 
 class CreateOrder(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     symbol: str
     side: str
     qty: Optional[float] = None
@@ -541,8 +570,8 @@ class CreateOrder(BaseModel):
     limit_price: Optional[float] = None
     stop_price: Optional[float] = None
     order_class: Optional[str] = None
-    take_profit: Optional[Dict[str, Any]] = None
-    stop_loss: Optional[Dict[str, Any]] = None
+    take_profit: Optional[TakeProfitLeg] = None
+    stop_loss: Optional[StopLossLeg] = None
     extended_hours: Optional[bool] = None
     trail_price: Optional[float] = None
     trail_percent: Optional[float] = None
@@ -560,8 +589,63 @@ def _order_payload_from_model(order: Union[BaseModel, Dict[str, Any]]) -> Dict[s
     return {k: v for k, v in dict(order).items() if v is not None}
 
 
+def _submit_order_sync(payload: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        return anyio.from_thread.run(_submit_order_async, payload)
+    except RuntimeError:
+        return asyncio.run(_submit_order_async(payload))
+
+
 def _prepare_order_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
-    normalised = dict(payload)
+    normalised = deepcopy(payload)
+
+    def _clean_leg(value: Any) -> Optional[Dict[str, Any]]:
+        if isinstance(value, BaseModel):
+            value = value.model_dump(exclude_none=True)
+        if isinstance(value, dict):
+            cleaned = {k: v for k, v in value.items() if v is not None}
+            return cleaned or None
+        return None
+
+    take_profit = _clean_leg(normalised.get("take_profit"))
+    if take_profit:
+        normalised["take_profit"] = take_profit
+    else:
+        normalised.pop("take_profit", None)
+
+    stop_loss = _clean_leg(normalised.get("stop_loss"))
+    if stop_loss:
+        normalised["stop_loss"] = stop_loss
+    else:
+        normalised.pop("stop_loss", None)
+
+    order_type = str(normalised.get("type") or "").lower()
+    if order_type != "trailing_stop":
+        normalised.pop("trail_price", None)
+        normalised.pop("trail_percent", None)
+    else:
+        if normalised.get("trail_price") in (None, 0):
+            normalised.pop("trail_price", None)
+        if normalised.get("trail_percent") in (None, 0):
+            normalised.pop("trail_percent", None)
+
+    if stop_loss:
+        def _to_float(value: Any) -> Optional[float]:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        top_level_stop = _to_float(normalised.get("stop_price"))
+        stop_loss_stop = _to_float(stop_loss.get("stop_price"))
+        if order_type not in {"stop", "stop_limit"} or (
+            top_level_stop is not None and stop_loss_stop is not None and abs(top_level_stop - stop_loss_stop) < 1e-9
+        ):
+            normalised.pop("stop_price", None)
+    else:
+        if normalised.get("order_class") in {"bracket", "oco", "oto"}:
+            normalised.pop("stop_price", None)
+
     _enforce_ext_policy(normalised)
     normalised["client_order_id"] = _resolve_client_order_id(normalised.get("client_order_id"))
     return normalised
@@ -849,7 +933,7 @@ def healthz():
 
 # -- Orders
 @app.post("/v2/orders/sync")
-async def order_create_sync(
+def order_create_sync(
     order: CreateOrder,
     request: Request,
 ):
@@ -860,7 +944,7 @@ async def order_create_sync(
     """
     _require_gateway_key_from_request(request)
     payload = _order_payload_from_model(order)
-    return await _submit_order_async(payload)
+    return _submit_order_sync(payload)
 
 
 

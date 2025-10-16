@@ -1120,26 +1120,22 @@
           "take_profit": {
             "anyOf": [
               {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/TakeProfitLeg"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Take Profit"
+            ]
           },
           "stop_loss": {
             "anyOf": [
               {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/StopLossLeg"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Stop Loss"
+            ]
           },
           "extended_hours": {
             "anyOf": [
@@ -1186,6 +1182,7 @@
             "title": "Client Order Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "symbol",
@@ -1326,7 +1323,7 @@
               }
             ],
             "title": "Stop Price",
-            "description": "Stop price for stop or stop-limit orders."
+            "description": "Top-level stop price for standalone stop or stop-limit orders."
           },
           "trail_price": {
             "anyOf": [
@@ -1338,7 +1335,7 @@
               }
             ],
             "title": "Trail Price",
-            "description": "Trailing stop price."
+            "description": "Trailing stop price (ignored unless type is trailing_stop)."
           },
           "trail_percent": {
             "anyOf": [
@@ -1350,57 +1347,29 @@
               }
             ],
             "title": "Trail Percent",
-            "description": "Trailing stop percentage."
+            "description": "Trailing stop percentage (ignored unless type is trailing_stop)."
           },
           "take_profit": {
             "anyOf": [
               {
-                "additionalProperties": {
-                  "anyOf": [
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "string"
-                    }
-                  ]
-                },
-                "type": "object"
+                "$ref": "#/components/schemas/TakeProfitLeg"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Take Profit",
-            "description": "Optional take-profit leg details (e.g. limit_price)."
+            "description": "Optional take-profit child order details."
           },
           "stop_loss": {
             "anyOf": [
               {
-                "additionalProperties": {
-                  "anyOf": [
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "string"
-                    }
-                  ]
-                },
-                "type": "object"
+                "$ref": "#/components/schemas/StopLossLeg"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Stop Loss",
-            "description": "Optional stop-loss leg details (e.g. stop_price)."
+            "description": "Optional stop-loss child order details."
           },
           "notes": {
             "anyOf": [
@@ -1618,6 +1587,48 @@
           "plan_summary"
         ],
         "title": "OrderPlanResponse"
+      },
+      "StopLossLeg": {
+        "properties": {
+          "stop_price": {
+            "type": "number",
+            "title": "Stop Price",
+            "description": "Trigger price for the stop-loss child leg (e.g., 225.0)."
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price",
+            "description": "Optional limit price for a stop-limit child leg. Omit to use a market stop; set slightly below the stop (e.g., 224.0) when a limit is required."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "stop_price"
+        ],
+        "title": "StopLossLeg"
+      },
+      "TakeProfitLeg": {
+        "properties": {
+          "limit_price": {
+            "type": "number",
+            "title": "Limit Price",
+            "description": "Limit price for the take-profit child leg."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "limit_price"
+        ],
+        "title": "TakeProfitLeg"
       },
       "ValidationError": {
         "properties": {
