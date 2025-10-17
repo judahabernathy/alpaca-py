@@ -1004,7 +1004,7 @@ def healthz():
 
 
 # -- Orders
-@app.post("/v2/orders/sync", responses=ORDER_REJECT_RESPONSE)
+@app.post("/v2/orders/sync", responses={409: {"model": OrderRejectResponse, "description": "Business rule rejection"}})
 def order_create_sync(
     order: CreateOrder,
     request: Request,
@@ -1021,7 +1021,7 @@ def order_create_sync(
 
 
 
-@app.post("/v2/orders", responses=ORDER_REJECT_RESPONSE)
+@app.post("/v2/orders", responses={409: {"model": OrderRejectResponse, "description": "Business rule rejection"}})
 async def order_create(
     order: CreateOrder,
     request: Request,
@@ -1446,6 +1446,17 @@ def _build_openapi_schema(routes) -> Dict[str, Any]:
     info.setdefault("license", {"name": "Proprietary", "url": "https://alpaca-py-production.up.railway.app/legal"})
 
     paths = schema.setdefault("paths", {})
+
+    for path, method in (("/v2/orders", "post"), ("/v2/orders/sync", "post")):
+        operation = paths.get(path, {}).get(method)
+        if isinstance(operation, dict):
+            responses = operation.get("responses") or {}
+            problem = responses.get("409")
+            if isinstance(problem, dict):
+                content = problem.setdefault("content", {})
+                payload = content.pop("application/json", None)
+                if payload is not None:
+                    content["application/problem+json"] = payload
     for path_item in paths.values():
         for operation in path_item.values():
             if not isinstance(operation, dict):
