@@ -69,6 +69,16 @@
               }
             }
           },
+          "409": {
+            "description": "Business rule rejection",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRejectResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -136,6 +146,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Business rule rejection",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRejectResponse"
                 }
               }
             }
@@ -1223,6 +1243,39 @@
             }
           }
         ]
+      },
+      "OrderRejectResponse": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "reason_code"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "const": 409
+          },
+          "detail": {
+            "type": "string"
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
       },
       "HTTPValidationError": {
         "properties": {

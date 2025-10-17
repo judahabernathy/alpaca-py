@@ -116,6 +116,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: Business rule rejection
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/OrderRejectResponse'
         '422':
           description: Validation Error
           content:
