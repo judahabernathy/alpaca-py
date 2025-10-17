@@ -68,6 +68,24 @@ except ValueError:
 configure_logging()
 
 
+class OrderReject(Exception):
+    def __init__(
+        self,
+        *,
+        reason_code: str,
+        detail: str,
+        title: str = "Order rejected",
+        status: int = 409,
+        context: Optional[Dict[str, Any]] | None = None,
+    ) -> None:
+        super().__init__(detail)
+        self.reason_code = reason_code
+        self.detail = detail
+        self.title = title
+        self.status = status
+        self.context = context or {}
+
+
 @lru_cache(maxsize=1)
 def _cached_openai_client(api_key: str, base_url: Optional[str], timeout: float) -> AsyncOpenAI:
     headers = {"User-Agent": "alpaca-py/order-plan/1.0"}
@@ -113,6 +131,20 @@ async def _app_lifespan(application: FastAPI):
 
 app = FastAPI(title="Alpaca Wrapper", version="1.0.3", lifespan=_app_lifespan)
 
+
+@app.exception_handler(OrderReject)
+async def order_reject_handler(_: Request, exc: OrderReject) -> JSONResponse:
+    problem = {
+        "type": f"https://errors.alpaca/{exc.reason_code}",
+        "title": exc.title,
+        "status": exc.status,
+        "detail": exc.detail,
+        "reason_code": exc.reason_code,
+    }
+    if exc.context:
+        problem["context"] = exc.context
+    return JSONResponse(problem, status_code=exc.status, media_type="application/problem+json")
+
 from .extras import router as extras_router
 app.include_router(extras_router)
 
@@ -141,7 +173,7 @@ def evaluate_limit_guard(symbol: str, limit_price: Any, side: str) -> None:
     try:
         limit_value = float(cast(Union[str, float, int], limit_price))
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail={"reason": "invalid_limit_price"}) from None
+        raise OrderReject(reason_code="INVALID_LIMIT_PRICE", detail="Limit price must be numeric.")
 
     normalised_side = (side or "").lower()
     if normalised_side not in {"buy", "sell"}:
@@ -184,9 +216,11 @@ def evaluate_limit_guard(symbol: str, limit_price: Any, side: str) -> None:
     now = datetime.now(timezone.utc)
     age = max((now - timestamp).total_seconds(), 0.0)
     if age > max(ttl_seconds, 0.0):
-        raise HTTPException(
-            status_code=428,
-            detail={"reason": "stale", "age": age, "ttl_seconds": ttl_seconds, "feed": feed},
+        detail = f"Quote age {age * 1000:.0f}ms exceeds ttl {ttl_seconds * 1000:.0f}ms."
+        raise OrderReject(
+            reason_code="QUOTE_TOO_OLD",
+            detail=detail,
+            context={"age_seconds": age, "ttl_seconds": ttl_seconds, "feed": feed},
         )
 
     reference_attr = "ask_price" if normalised_side == "buy" else "bid_price"
@@ -206,14 +240,13 @@ def evaluate_limit_guard(symbol: str, limit_price: Any, side: str) -> None:
     max_drift = max(drift_bps, 0.0) / 10000.0
     exceeds = drift > max_drift if normalised_side == "buy" else (-drift) > max_drift
     if exceeds:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "reason": "drift",
-                "drift": drift,
-                "max_drift": max_drift,
-                "side": normalised_side,
-            },
+        drift_bps_actual = abs(drift) * 10000.0
+        max_bps = max_drift * 10000.0
+        message = f"Drift {drift_bps_actual:.1f}bps exceeds max {max_bps:.1f}bps."
+        raise OrderReject(
+            reason_code="BIDASK_DRIFT",
+            detail=message,
+            context={"drift": drift, "max_drift": max_drift, "side": normalised_side},
         )
 
 
@@ -236,17 +269,19 @@ def _enforce_ext_policy(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     if extended_hours:
         if order_type != "limit":
-            raise HTTPException(status_code=400, detail="Extended hours orders must be limit orders")
+            raise OrderReject(reason_code="EXT_INVALID_TYPE", detail="Extended hours orders must be limit orders.")
         if tif != "day":
-            raise HTTPException(status_code=400, detail="Extended hours limit orders must be DAY")
+            raise OrderReject(reason_code="EXT_INVALID_TIF", detail="Extended hours limit orders must be DAY.")
         if payload.get("order_class"):
-            raise HTTPException(status_code=400, detail="Extended hours does not support advanced order classes")
+            raise OrderReject(reason_code="EXT_UNSUPPORTED_CLASS", detail="Extended hours does not support advanced order classes.")
         if payload.get("limit_price") is None:
-            raise HTTPException(status_code=400, detail="Extended hours limit orders require limit_price")
+            raise OrderReject(reason_code="EXT_MISSING_LIMIT", detail="Extended hours limit orders require limit_price.")
 
     if order_type == "limit" and payload.get("limit_price") is not None:
         try:
             evaluate_limit_guard((payload.get("symbol") or ""), payload.get("limit_price"), (payload.get("side") or ""))
+        except OrderReject:
+            raise
         except HTTPException as exc:
             if exc.status_code in {400, 409, 428}:
                 raise
@@ -650,6 +685,31 @@ def _prepare_order_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     normalised["client_order_id"] = _resolve_client_order_id(normalised.get("client_order_id"))
     return normalised
 
+def _normalise_reason_code(value: Optional[str]) -> str:
+    if not value:
+        return "ORDER_REJECTED"
+    cleaned = re.sub(r'[^A-Za-z0-9]+', '_', str(value)).strip('_')
+    return cleaned.upper() or "ORDER_REJECTED"
+
+
+def _order_reject_from_response(status: int, body: str) -> OrderReject:
+    detail = body or "order rejected"
+    context: Dict[str, Any] = {}
+    source = None
+    if body:
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            data = None
+        else:
+            if isinstance(data, dict):
+                detail = str(data.get('detail') or data.get('message') or detail)
+                source = data.get('reason_code') or data.get('code') or data.get('reason')
+                context = {k: v for k, v in data.items() if k not in {'detail', 'message', 'reason_code', 'code', 'reason'}}
+    reason_code = _normalise_reason_code(source)
+    return OrderReject(reason_code=reason_code, detail=detail, status=status, context=context or None)
+
+
 
 async def _submit_order_async(payload: Dict[str, Any]) -> Dict[str, Any]:
     prepared = _prepare_order_payload(payload)
@@ -659,6 +719,8 @@ async def _submit_order_async(payload: Dict[str, Any]) -> Dict[str, Any]:
         "/v2/orders",
         json=prepared,
     )
+    if status == 409:
+        raise _order_reject_from_response(status, body)
     if status >= 400:
         raise HTTPException(status_code=status, detail=body or "order rejected")
     return _decode_json(headers, body)

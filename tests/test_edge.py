@@ -276,9 +276,9 @@ def test_ext_requires_limit_day_and_forbids_bracket(monkeypatch):
         "order_class": None,
         "limit_price": None,
     }
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(app.OrderReject) as excinfo:
         app._enforce_ext_policy(payload)
-    assert excinfo.value.status_code == 400
+    assert excinfo.value.reason_code == "EXT_INVALID_TYPE"
 
     payload = {
         "symbol": "AAPL",
@@ -288,9 +288,9 @@ def test_ext_requires_limit_day_and_forbids_bracket(monkeypatch):
         "order_class": None,
         "limit_price": 123.45,
     }
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(app.OrderReject) as excinfo:
         app._enforce_ext_policy(payload)
-    assert excinfo.value.status_code == 400
+    assert excinfo.value.reason_code == "EXT_INVALID_TIF"
 
     payload = {
         "symbol": "AAPL",
@@ -300,9 +300,21 @@ def test_ext_requires_limit_day_and_forbids_bracket(monkeypatch):
         "order_class": "bracket",
         "limit_price": 123.45,
     }
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(app.OrderReject) as excinfo:
         app._enforce_ext_policy(payload)
-    assert excinfo.value.status_code == 400
+    assert excinfo.value.reason_code == "EXT_UNSUPPORTED_CLASS"
+
+    payload = {
+        "symbol": "AAPL",
+        "type": "limit",
+        "time_in_force": "day",
+        "extended_hours": True,
+        "order_class": None,
+        "limit_price": None,
+    }
+    with pytest.raises(app.OrderReject) as excinfo:
+        app._enforce_ext_policy(payload)
+    assert excinfo.value.reason_code == "EXT_MISSING_LIMIT"
 
     os.environ.pop("ALPHA_ENFORCE_EXT", None)
 
@@ -311,13 +323,13 @@ def test_ttl_and_drift_gates(monkeypatch):
     os.environ["ALPHA_ENFORCE_EXT"] = "1"
 
     def fake_eval_stale(symbol, limit_price, side):
-        raise HTTPException(status_code=428, detail={"reason": "stale"})
+        raise app.OrderReject(reason_code="QUOTE_TOO_OLD", detail="stale")
 
     def fake_eval_drift(symbol, limit_price, side):
-        raise HTTPException(status_code=409, detail={"reason": "drift"})
+        raise app.OrderReject(reason_code="BIDASK_DRIFT", detail="drift")
 
     monkeypatch.setattr(app, "evaluate_limit_guard", fake_eval_stale)
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(app.OrderReject) as excinfo:
         app._enforce_ext_policy(
             {
                 "symbol": "AAPL",
@@ -328,10 +340,10 @@ def test_ttl_and_drift_gates(monkeypatch):
                 "limit_price": 123,
             }
         )
-    assert excinfo.value.status_code == 428
+    assert excinfo.value.reason_code == "QUOTE_TOO_OLD"
 
     monkeypatch.setattr(app, "evaluate_limit_guard", fake_eval_drift)
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(app.OrderReject) as excinfo:
         app._enforce_ext_policy(
             {
                 "symbol": "AAPL",
@@ -342,12 +354,7 @@ def test_ttl_and_drift_gates(monkeypatch):
                 "limit_price": 123,
             }
         )
-    assert excinfo.value.status_code == 409
-
-    os.environ.pop("ALPHA_ENFORCE_EXT", None)
-
-
-    assert excinfo.value.status_code == 409
+    assert excinfo.value.reason_code == "BIDASK_DRIFT"
 
     os.environ.pop("ALPHA_ENFORCE_EXT", None)
 
@@ -414,11 +421,11 @@ def test_evaluate_limit_guard_marks_stale(monkeypatch):
     monkeypatch.setenv("ALPHA_QUOTE_TTL_SECONDS", "5")
     monkeypatch.setattr(app, "md_client", lambda: FakeClient())
 
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(app.OrderReject) as excinfo:
         app.evaluate_limit_guard(symbol, 101, "buy")
 
-    assert excinfo.value.status_code == 428
-    assert excinfo.value.detail["reason"] == "stale"
+    assert excinfo.value.reason_code == "QUOTE_TOO_OLD"
+    assert "Quote age" in excinfo.value.detail
 
 
 
@@ -440,11 +447,11 @@ def test_evaluate_limit_guard_marks_drift(monkeypatch):
     monkeypatch.setenv("ALPHA_MAX_DRIFT_BPS", "50")
     monkeypatch.setattr(app, "md_client", lambda: FakeClient())
 
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(app.OrderReject) as excinfo:
         app.evaluate_limit_guard(symbol, 101, "buy")
 
-    assert excinfo.value.status_code == 409
-    assert excinfo.value.detail["reason"] == "drift"
+    assert excinfo.value.reason_code == "BIDASK_DRIFT"
+    assert 'Drift' in excinfo.value.detail
 
 
 
@@ -507,11 +514,10 @@ def test_evaluate_limit_guard_allows_valid_payload(monkeypatch):
 
 
 def test_evaluate_limit_guard_invalid_limit_price():
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(app.OrderReject) as excinfo:
         app.evaluate_limit_guard("AAPL", "oops", "buy")
+    assert excinfo.value.reason_code == "INVALID_LIMIT_PRICE"
 
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail["reason"] == "invalid_limit_price"
 
 
 def test_enforce_ext_policy_rejects_advanced_order_class(monkeypatch):
@@ -526,10 +532,10 @@ def test_enforce_ext_policy_rejects_advanced_order_class(monkeypatch):
         "limit_price": 300,
     }
 
-    with pytest.raises(HTTPException) as excinfo:
+    with pytest.raises(app.OrderReject) as excinfo:
         app._enforce_ext_policy(payload)
 
-    assert excinfo.value.status_code == 400
+    assert excinfo.value.reason_code == "EXT_UNSUPPORTED_CLASS"
 
 
 @pytest.mark.asyncio
@@ -882,6 +888,25 @@ async def test_submit_order_async_error(monkeypatch):
 @pytest.mark.asyncio
 async def test_submit_order_async_invalid_json(monkeypatch):
     monkeypatch.setattr(app, "_prepare_order_payload", lambda payload: payload)
+
+
+@pytest.mark.asyncio
+async def test_submit_order_async_maps_guard_reject(monkeypatch):
+    monkeypatch.setattr(app, '_prepare_order_payload', lambda payload: payload)
+
+    async def fake_request(client, method, path, **kwargs):
+        payload = {"detail": "Quote age 4200ms > ttl 3000ms", "reason_code": "QUOTE_TOO_OLD"}
+        return 409, {"Content-Type": "application/json"}, json.dumps(payload)
+
+    monkeypatch.setattr(app, '_request_with_retry', fake_request)
+    monkeypatch.setattr(app, '_get_trading_http_client', lambda: object())
+
+    with pytest.raises(app.OrderReject) as excinfo:
+        await app._submit_order_async({"symbol": "AAPL"})
+
+    assert excinfo.value.reason_code == "QUOTE_TOO_OLD"
+    assert excinfo.value.detail == "Quote age 4200ms > ttl 3000ms"
+
 
     async def fake_request(client, method, path, **kwargs):
         return 200, {"Content-Type": "application/json"}, "not json"
