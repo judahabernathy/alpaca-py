@@ -85,6 +85,16 @@ class OrderReject(Exception):
         self.status = status
         self.context = context or {}
 
+class OrderRejectResponse(BaseModel):
+    type: str = Field(default='https://errors.alpaca/ORDER_REJECTED')
+    title: str = 'Order rejected'
+    status: Literal[409] = 409
+    detail: str
+    reason_code: str
+    context: Optional[Dict[str, Any]] = None
+
+
+
 
 @lru_cache(maxsize=1)
 def _cached_openai_client(api_key: str, base_url: Optional[str], timeout: float) -> AsyncOpenAI:
@@ -994,7 +1004,7 @@ def healthz():
 
 
 # -- Orders
-@app.post("/v2/orders/sync")
+@app.post("/v2/orders/sync", responses={409: {"model": OrderRejectResponse, "description": "Business rule rejection"}})
 def order_create_sync(
     order: CreateOrder,
     request: Request,
@@ -1011,7 +1021,7 @@ def order_create_sync(
 
 
 
-@app.post("/v2/orders")
+@app.post("/v2/orders", responses={409: {"model": OrderRejectResponse, "description": "Business rule rejection"}})
 async def order_create(
     order: CreateOrder,
     request: Request,
