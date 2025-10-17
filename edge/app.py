@@ -1004,7 +1004,7 @@ def healthz():
 
 
 # -- Orders
-@app.post("/v2/orders/sync", responses={409: {"model": OrderRejectResponse, "description": "Business rule rejection"}})
+@app.post("/v2/orders/sync", responses=ORDER_REJECT_RESPONSE)
 def order_create_sync(
     order: CreateOrder,
     request: Request,
@@ -1021,7 +1021,7 @@ def order_create_sync(
 
 
 
-@app.post("/v2/orders", responses={409: {"model": OrderRejectResponse, "description": "Business rule rejection"}})
+@app.post("/v2/orders", responses=ORDER_REJECT_RESPONSE)
 async def order_create(
     order: CreateOrder,
     request: Request,
