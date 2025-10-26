@@ -2,9 +2,9 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
+from alpaca.common.models import ModelWithID, ValidateBaseModel as BaseModel
+
 from alpaca.broker.enums import CIPApprovalStatus, CIPProvider, CIPResult, CIPStatus
-from alpaca.common.models import ModelWithID
-from alpaca.common.models import ValidateBaseModel as BaseModel
 
 
 class CIPKYCInfo(BaseModel):
@@ -256,10 +256,10 @@ class CIPInfo(ModelWithID):
 
     def __init__(self, *args, **kwargs):
         # upcast into uuid
-        if "id" in kwargs and isinstance(kwargs["id"], str):
+        if "id" in kwargs and type(kwargs["id"]) == str:
             kwargs["id"] = UUID(kwargs["id"])
 
-        if "account_id" in kwargs and isinstance(kwargs["account_id"], str):
+        if "account_id" in kwargs and type(kwargs["account_id"]) == str:
             kwargs["account_id"] = UUID(kwargs["account_id"])
 
         super().__init__(*args, **kwargs)

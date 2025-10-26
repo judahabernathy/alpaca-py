@@ -6,6 +6,8 @@ from pydantic import field_serializer, field_validator, model_validator
 
 from alpaca.broker.enums import (
     AccountEntities,
+    AccountSubType,
+    AccountType,
     BankAccountType,
     CalendarSubType,
     DocumentType,
@@ -120,6 +122,8 @@ class CreateAccountRequest(NonEmptyRequest):
     """Class used to format data necessary for making a request to create a brokerage account
 
     Attributes:
+        account_type (Optional[AccountType]): The type of account
+        account_sub_type (Optional[AccountSubType]): The sub type of account
         contact (Contact): The contact details for the account holder
         identity (Identity): The identity details for the account holder
         disclosures (Disclosures): The account holder's political disclosures
@@ -128,6 +132,8 @@ class CreateAccountRequest(NonEmptyRequest):
         trusted_contact (TrustedContact): The account holder's trusted contact details
     """
 
+    account_type: Optional[Union[AccountType, str]] = None
+    account_sub_type: Optional[Union[AccountSubType, str]] = None
     contact: Contact
     identity: Identity
     disclosures: Disclosures
@@ -143,18 +149,15 @@ class CreateAccountRequest(NonEmptyRequest):
         Validate parameters that are optional in the response but not in the request.
         """
         nullable_fields_by_model = {
-            "contact": ["phone_number"],
-            "identity": ["date_of_birth"],
-            "disclosures": [
-                "is_control_person",
-                "is_affiliated_exchange_or_finra",
-                "is_politically_exposed",
-            ],
+            "contact": "phone_number",
+            "identity": "date_of_birth",
+            "disclosures": "is_control_person",
+            "disclosures": "is_affiliated_exchange_or_finra",
+            "disclosures": "is_politically_exposed",
         }
-        for model, fields in nullable_fields_by_model.items():
-            for field in fields:
-                if dict(values[model]).get(field) is None:
-                    raise ValueError(f"{field} is required to create a new account.")
+        for model, field in nullable_fields_by_model.items():
+            if dict(values[model]).get(field, None) is None:
+                raise ValueError(f"{field} is required to create a new account.")
         return values
 
 
@@ -378,7 +381,7 @@ class GetAccountActivitiesRequest(NonEmptyRequest):
     page_token: Optional[Union[UUID, str]] = None
 
     def __init__(self, *args, **kwargs):
-        if "account_id" in kwargs and isinstance(kwargs["account_id"], str):
+        if "account_id" in kwargs and type(kwargs["account_id"]) == str:
             kwargs["account_id"] = UUID(kwargs["account_id"])
 
         super().__init__(*args, **kwargs)

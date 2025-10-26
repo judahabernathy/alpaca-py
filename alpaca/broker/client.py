@@ -50,7 +50,6 @@ from alpaca.broker.requests import (
     UpdateAccountRequest,
     UpdatePortfolioRequest,
     UploadDocumentRequest,
-    UploadW8BenDocumentRequest,
 )
 from alpaca.common import RawData
 from alpaca.common.constants import (
@@ -93,6 +92,31 @@ from alpaca.trading.requests import (
     GetPortfolioHistoryRequest,
     ReplaceOrderRequest,
     UpdateWatchlistRequest,
+)
+
+from ..common import RawData
+from ..common.rest import HTTPResult, RESTClient
+from .enums import ACHRelationshipStatus
+from .requests import (
+    CreateAccountRequest,
+    CreateACHRelationshipRequest,
+    CreateACHTransferRequest,
+    CreateBankRequest,
+    CreateBankTransferRequest,
+    CreateBatchJournalRequest,
+    CreateJournalRequest,
+    CreatePlaidRelationshipRequest,
+    CreateReverseBatchJournalRequest,
+    GetAccountActivitiesRequest,
+    GetEventsRequest,
+    GetJournalsRequest,
+    GetTradeDocumentsRequest,
+    GetTransfersRequest,
+    ListAccountsRequest,
+    OrderRequest,
+    UpdateAccountRequest,
+    UploadDocumentRequest,
+    UploadW8BenDocumentRequest,
 )
 
 
@@ -309,7 +333,6 @@ class BrokerClient(RESTClient):
             "delete_account is deprecated and will be removed in a future version."
             "Please use `close_account(account_id)` instead",
             DeprecationWarning,
-            stacklevel=2,
         )
 
         self.close_account(account_id)
@@ -357,7 +380,7 @@ class BrokerClient(RESTClient):
             params["entities"] = ",".join(params["entities"])
 
         response = self.get(
-            "/accounts",
+            f"/accounts",
             params,
         )
 
@@ -754,7 +777,7 @@ class BrokerClient(RESTClient):
                 if "code" in response.text:
                     error = response.json()
                     if "code" in error:
-                        raise APIError(error, http_error) from http_error
+                        raise APIError(error, http_error)
                 else:
                     raise http_error
 
@@ -1574,7 +1597,7 @@ class BrokerClient(RESTClient):
         # checking to see if we specified at least one param
         params = filter.to_request_fields() if filter is not None else {}
 
-        response = self.get("/assets", params)
+        response = self.get(f"/assets", params)
 
         if self._use_raw_data:
             return response

@@ -1,3 +1,4 @@
+import json
 import warnings
 from typing import List, Optional, Union
 from uuid import UUID
@@ -361,7 +362,7 @@ class TradingClient(RESTClient):
             PortfolioHistory: The portfolio history statistics for the account.
         """
         response = self.get(
-            "/account/portfolio/history",
+            f"/account/portfolio/history",
             history_filter.to_request_fields() if history_filter else {},
         )
 
@@ -692,7 +693,6 @@ class TradingClient(RESTClient):
             "get_corporate_announcements is deprecated and will be removed in a future version."
             "Please use alpaca.data.historical.corporate_actions.CorporateActionsClient.get_corporate_actions() instead",
             DeprecationWarning,
-            stacklevel=2,
         )
 
         params = filter.to_request_fields() if filter else {}
@@ -782,3 +782,4 @@ class TradingClient(RESTClient):
             return response
 
         return TypeAdapter(OptionContract).validate_python(response)
+

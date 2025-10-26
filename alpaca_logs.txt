@@ -1,0 +1,571 @@
+Starting Container
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+2025-10-10T13:19:45.313644799Z [INFO]  event="startup_complete"
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+2025-10-10T13:20:35.299034740Z [INFO]  correlation_id="d70957e6-cba7-48b8-933d-08719de46468" event="incoming_request" method="GET" path="/v2/account"
+2025-10-10T13:20:35.299044178Z [INFO]  correlation_id="d70957e6-cba7-48b8-933d-08719de46468" event="gateway_key_header" length=9 present=true
+2025-10-10T13:20:35.299050397Z [INFO]  correlation_id="d70957e6-cba7-48b8-933d-08719de46468" event="http_request" latency_ms=72.31 method="GET" status=200 url="https://api.alpaca.markets/v2/account"
+2025-10-10T13:20:35.299056355Z [INFO]  correlation_id="d70957e6-cba7-48b8-933d-08719de46468" event="request_complete" latency_ms=75.06 status=200
+INFO:     100.64.0.2:11804 - "GET /v2/account HTTP/1.1" 200 OK
+2025-10-10T14:45:59.275892102Z [INFO]  correlation_id="ea50df5b-2ffb-4e4d-a711-8896fc5e10de" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T14:45:59.275906881Z [INFO]  correlation_id="ea50df5b-2ffb-4e4d-a711-8896fc5e10de" event="gateway_key_header" length=9 present=true
+2025-10-10T14:45:59.275916789Z [INFO]  correlation_id="ea50df5b-2ffb-4e4d-a711-8896fc5e10de" event="http_request" latency_ms=122.11 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:45:59.275924414Z [INFO]  correlation_id="ea50df5b-2ffb-4e4d-a711-8896fc5e10de" event="request_complete" latency_ms=135.77 status=200
+INFO:     100.64.0.3:33202 - "POST /v2/orders/sync HTTP/1.1" 200 OK
+2025-10-10T14:46:19.277384397Z [INFO]  correlation_id="becf48c0-ea64-4d46-8768-d21bb8b41b97" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T14:46:19.277390987Z [INFO]  correlation_id="becf48c0-ea64-4d46-8768-d21bb8b41b97" event="gateway_key_header" length=9 present=true
+2025-10-10T14:46:19.277397253Z [INFO]  correlation_id="becf48c0-ea64-4d46-8768-d21bb8b41b97" event="http_request" latency_ms=34.94 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:46:19.277404688Z [INFO]  correlation_id="becf48c0-ea64-4d46-8768-d21bb8b41b97" event="request_complete" latency_ms=36.58 status=200
+INFO:     100.64.0.3:30752 - "POST /v2/orders/sync HTTP/1.1" 200 OK
+2025-10-10T14:46:19.277415897Z [INFO]  correlation_id="0fdcdd9c-16b5-4741-896c-04a6be5e4c35" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T14:46:19.277422165Z [INFO]  correlation_id="0fdcdd9c-16b5-4741-896c-04a6be5e4c35" event="gateway_key_header" length=9 present=true
+2025-10-10T14:46:19.277428185Z [INFO]  correlation_id="0fdcdd9c-16b5-4741-896c-04a6be5e4c35" event="http_request" latency_ms=13.92 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+INFO:     100.64.0.4:32950 - "POST /v2/orders/sync HTTP/1.1" 200 OK
+2025-10-10T14:46:19.277441364Z [INFO]  correlation_id="0fdcdd9c-16b5-4741-896c-04a6be5e4c35" event="request_complete" latency_ms=15.66 status=200
+2025-10-10T14:46:19.859830012Z [INFO]  correlation_id="1444fa5c-2555-4d7c-9157-126a548f719b" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T14:46:19.859837153Z [INFO]  correlation_id="1444fa5c-2555-4d7c-9157-126a548f719b" event="gateway_key_header" length=9 present=true
+2025-10-10T14:46:19.898294592Z [INFO]  correlation_id="1444fa5c-2555-4d7c-9157-126a548f719b" event="http_request" latency_ms=39.09 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:46:19.898301006Z [INFO]  correlation_id="1444fa5c-2555-4d7c-9157-126a548f719b" event="request_complete" latency_ms=41.51 status=200
+INFO:     100.64.0.2:14474 - "POST /v2/orders/sync HTTP/1.1" 200 OK
+2025-10-10T14:46:22.372635359Z [INFO]  correlation_id="03d5be4e-8493-4993-8d5c-98497bb35f29" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T14:46:22.372648198Z [INFO]  correlation_id="03d5be4e-8493-4993-8d5c-98497bb35f29" event="gateway_key_header" length=9 present=true
+INFO:     100.64.0.2:14474 - "POST /v2/orders/sync HTTP/1.1" 403 Forbidden
+2025-10-10T14:46:22.383225682Z [INFO]  correlation_id="03d5be4e-8493-4993-8d5c-98497bb35f29" event="http_request" latency_ms=10.32 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:46:22.383231883Z [INFO]  correlation_id="03d5be4e-8493-4993-8d5c-98497bb35f29" event="request_complete" latency_ms=12.49 status=403
+2025-10-10T14:46:22.688319638Z [INFO]  correlation_id="8a2f9dc1-c1da-4a52-b8e9-1a9c3355c813" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T14:46:22.688331905Z [INFO]  correlation_id="8a2f9dc1-c1da-4a52-b8e9-1a9c3355c813" event="gateway_key_header" length=9 present=true
+2025-10-10T14:46:22.700473880Z [INFO]  correlation_id="8a2f9dc1-c1da-4a52-b8e9-1a9c3355c813" event="http_request" latency_ms=11.57 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:46:22.700482260Z [INFO]  correlation_id="8a2f9dc1-c1da-4a52-b8e9-1a9c3355c813" event="request_complete" latency_ms=13.61 status=403
+INFO:     100.64.0.2:14474 - "POST /v2/orders/sync HTTP/1.1" 403 Forbidden
+2025-10-10T14:46:52.711228542Z [INFO]  correlation_id="104e27de-ce49-466d-8a5d-e01810f45905" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T14:46:52.711238925Z [INFO]  correlation_id="104e27de-ce49-466d-8a5d-e01810f45905" event="gateway_key_header" length=9 present=true
+2025-10-10T14:46:52.711246713Z [INFO]  correlation_id="104e27de-ce49-466d-8a5d-e01810f45905" event="http_request" latency_ms=28.51 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:46:52.711252678Z [INFO]  correlation_id="104e27de-ce49-466d-8a5d-e01810f45905" event="request_complete" latency_ms=30.19 status=200
+INFO:     100.64.0.5:30130 - "POST /v2/orders/sync HTTP/1.1" 200 OK
+2025-10-10T14:47:12.716939062Z [INFO]  correlation_id="dcd2bcc1-6dbf-4dbb-94b1-965d855e6738" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T14:47:12.716947153Z [INFO]  correlation_id="dcd2bcc1-6dbf-4dbb-94b1-965d855e6738" event="gateway_key_header" length=9 present=true
+2025-10-10T14:47:12.716953452Z [INFO]  correlation_id="dcd2bcc1-6dbf-4dbb-94b1-965d855e6738" event="http_request" latency_ms=121.48 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:47:12.716959048Z [INFO]  correlation_id="dcd2bcc1-6dbf-4dbb-94b1-965d855e6738" event="request_complete" latency_ms=124.67 status=200
+INFO:     100.64.0.4:51528 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T14:47:42.720946516Z [INFO]  correlation_id="2372e305-9e56-4009-8f38-8b9512fa890a" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T14:47:42.720958988Z [INFO]  correlation_id="2372e305-9e56-4009-8f38-8b9512fa890a" event="gateway_key_header" length=9 present=true
+2025-10-10T14:47:42.720965273Z [INFO]  correlation_id="2372e305-9e56-4009-8f38-8b9512fa890a" event="http_request" latency_ms=30.96 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:47:42.720972082Z [INFO]  correlation_id="2372e305-9e56-4009-8f38-8b9512fa890a" event="request_complete" latency_ms=32.7 status=200
+INFO:     100.64.0.3:49212 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T14:47:50.782447326Z [INFO]  correlation_id="8e632d19-4278-4f14-b5c8-b71fe4f52978" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T14:47:50.782459307Z [INFO]  correlation_id="8e632d19-4278-4f14-b5c8-b71fe4f52978" event="gateway_key_header" length=9 present=true
+2025-10-10T14:47:50.826801354Z [INFO]  correlation_id="8e632d19-4278-4f14-b5c8-b71fe4f52978" event="http_request" latency_ms=40.29 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:47:50.826835783Z [INFO]  correlation_id="8e632d19-4278-4f14-b5c8-b71fe4f52978" event="request_complete" latency_ms=41.74 status=200
+INFO:     100.64.0.6:10282 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T14:47:52.851296291Z [INFO]  correlation_id="ac6e44f2-390e-4cf4-b05c-d6ba50c88c7e" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T14:47:52.851306815Z [INFO]  correlation_id="ac6e44f2-390e-4cf4-b05c-d6ba50c88c7e" event="gateway_key_header" length=9 present=true
+2025-10-10T14:47:52.870011258Z [INFO]  correlation_id="ac6e44f2-390e-4cf4-b05c-d6ba50c88c7e" event="http_request" latency_ms=12.2 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:47:52.870018284Z [INFO]  correlation_id="ac6e44f2-390e-4cf4-b05c-d6ba50c88c7e" event="request_complete" latency_ms=13.9 status=200
+INFO:     100.64.0.7:60072 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T14:47:55.152313573Z [INFO]  correlation_id="9b9084ed-84d0-4df6-8706-b0a4d022982d" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T14:47:55.152319437Z [INFO]  correlation_id="9b9084ed-84d0-4df6-8706-b0a4d022982d" event="gateway_key_header" length=9 present=true
+2025-10-10T14:47:55.161298303Z [INFO]  correlation_id="9b9084ed-84d0-4df6-8706-b0a4d022982d" event="http_request" latency_ms=12.17 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:47:55.161304058Z [INFO]  correlation_id="9b9084ed-84d0-4df6-8706-b0a4d022982d" event="request_complete" latency_ms=13.62 status=200
+INFO:     100.64.0.6:10282 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T14:50:55.237901136Z [INFO]  correlation_id="08be7af7-3ff2-479d-a727-375cc85c73c5" event="incoming_request" method="GET" path="/v2/orders"
+2025-10-10T14:50:55.237905487Z [INFO]  correlation_id="08be7af7-3ff2-479d-a727-375cc85c73c5" event="gateway_key_header" length=9 present=true
+2025-10-10T14:50:55.237909936Z [INFO]  correlation_id="08be7af7-3ff2-479d-a727-375cc85c73c5" event="http_request" latency_ms=25.46 method="GET" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T14:50:55.237913973Z [INFO]  correlation_id="08be7af7-3ff2-479d-a727-375cc85c73c5" event="request_complete" latency_ms=26.89 status=200
+INFO:     100.64.0.7:14756 - "GET /v2/orders HTTP/1.1" 200 OK
+2025-10-10T15:04:45.807993555Z [INFO]  correlation_id="7a10ec6b-b83d-4cbc-862b-e863fe75c23d" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T15:04:45.807999906Z [INFO]  correlation_id="7a10ec6b-b83d-4cbc-862b-e863fe75c23d" event="gateway_key_header" length=9 present=true
+2025-10-10T15:04:45.808006403Z [INFO]  correlation_id="7a10ec6b-b83d-4cbc-862b-e863fe75c23d" event="http_request" latency_ms=29.36 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+INFO:     100.64.0.8:14898 - "POST /v2/orders/sync HTTP/1.1" 403 Forbidden
+2025-10-10T15:04:45.808023573Z [INFO]  correlation_id="7a10ec6b-b83d-4cbc-862b-e863fe75c23d" event="request_complete" latency_ms=33.54 status=403
+2025-10-10T15:04:45.808030138Z [INFO]  correlation_id="9a47ae55-5aff-448a-a456-5a565a5998f9" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T15:04:45.808036625Z [INFO]  correlation_id="9a47ae55-5aff-448a-a456-5a565a5998f9" event="gateway_key_header" length=9 present=true
+2025-10-10T15:04:45.808043008Z [INFO]  correlation_id="9a47ae55-5aff-448a-a456-5a565a5998f9" event="http_request" latency_ms=14.55 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:04:45.808049236Z [INFO]  correlation_id="9a47ae55-5aff-448a-a456-5a565a5998f9" event="request_complete" latency_ms=17.75 status=403
+INFO:     100.64.0.8:14898 - "POST /v2/orders/sync HTTP/1.1" 403 Forbidden
+2025-10-10T15:04:45.808062802Z [INFO]  correlation_id="f8029f9b-0ee5-4ec7-958b-1d021014e027" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T15:04:45.808069094Z [INFO]  correlation_id="f8029f9b-0ee5-4ec7-958b-1d021014e027" event="gateway_key_header" length=9 present=true
+2025-10-10T15:04:45.808182545Z [INFO]  correlation_id="f8029f9b-0ee5-4ec7-958b-1d021014e027" event="http_request" latency_ms=14.38 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:04:45.808189214Z [INFO]  correlation_id="f8029f9b-0ee5-4ec7-958b-1d021014e027" event="request_complete" latency_ms=16.07 status=200
+INFO:     100.64.0.2:13400 - "POST /v2/orders/sync HTTP/1.1" 200 OK
+2025-10-10T15:04:45.808202615Z [INFO]  correlation_id="f54796d5-1be4-41a4-b189-620becfcd88e" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T15:04:45.808209091Z [INFO]  correlation_id="f54796d5-1be4-41a4-b189-620becfcd88e" event="gateway_key_header" length=9 present=true
+2025-10-10T15:04:45.808216010Z [INFO]  correlation_id="f54796d5-1be4-41a4-b189-620becfcd88e" event="http_request" latency_ms=15.63 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:04:45.808248553Z [INFO]  correlation_id="f54796d5-1be4-41a4-b189-620becfcd88e" event="request_complete" latency_ms=17.41 status=200
+INFO:     100.64.0.4:13682 - "POST /v2/orders/sync HTTP/1.1" 200 OK
+2025-10-10T15:11:15.896368574Z [INFO]  correlation_id="46877611-ab19-4916-b459-425a9530badb" event="incoming_request" method="GET" path="/v2/account"
+2025-10-10T15:11:15.896373718Z [INFO]  correlation_id="46877611-ab19-4916-b459-425a9530badb" event="gateway_key_header" length=9 present=true
+2025-10-10T15:11:15.896381263Z [INFO]  correlation_id="46877611-ab19-4916-b459-425a9530badb" event="http_request" latency_ms=24.49 method="GET" status=200 url="https://api.alpaca.markets/v2/account"
+2025-10-10T15:11:15.896386786Z [INFO]  correlation_id="46877611-ab19-4916-b459-425a9530badb" event="request_complete" latency_ms=25.62 status=200
+INFO:     100.64.0.9:15054 - "GET /v2/account HTTP/1.1" 200 OK
+2025-10-10T15:11:45.879920902Z [INFO]  correlation_id="a88c0589-8e87-406c-8005-da7c3efccd3a" event="incoming_request" method="GET" path="/v2/positions"
+2025-10-10T15:11:45.879937821Z [INFO]  correlation_id="a88c0589-8e87-406c-8005-da7c3efccd3a" event="gateway_key_header" length=9 present=true
+2025-10-10T15:11:45.879946355Z [INFO]  correlation_id="a88c0589-8e87-406c-8005-da7c3efccd3a" event="http_request" latency_ms=116.88 method="GET" status=200 url="https://api.alpaca.markets/v2/positions"
+2025-10-10T15:11:45.879953168Z [INFO]  correlation_id="a88c0589-8e87-406c-8005-da7c3efccd3a" event="request_complete" latency_ms=117.82 status=200
+INFO:     100.64.0.9:26346 - "GET /v2/positions HTTP/1.1" 200 OK
+2025-10-10T15:12:35.893359926Z [INFO]  correlation_id="5aa67669-d3cc-44e5-9dee-3eb7f843aef8" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T15:12:35.893369587Z [INFO]  correlation_id="5aa67669-d3cc-44e5-9dee-3eb7f843aef8" event="gateway_key_header" length=9 present=true
+2025-10-10T15:12:35.893375917Z [INFO]  correlation_id="5aa67669-d3cc-44e5-9dee-3eb7f843aef8" event="http_request" latency_ms=39.95 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:12:35.893381423Z [INFO]  correlation_id="5aa67669-d3cc-44e5-9dee-3eb7f843aef8" event="request_complete" latency_ms=43.76 status=200
+INFO:     100.64.0.2:50762 - "POST /v2/orders/sync HTTP/1.1" 200 OK
+2025-10-10T15:12:35.893393583Z [INFO]  correlation_id="ca52b37c-5e91-4fe2-b81c-92f7eaf20f62" event="incoming_request" method="POST" path="/v2/orders/sync"
+2025-10-10T15:12:35.893400076Z [INFO]  correlation_id="ca52b37c-5e91-4fe2-b81c-92f7eaf20f62" event="gateway_key_header" length=9 present=true
+2025-10-10T15:12:35.893405008Z [INFO]  correlation_id="ca52b37c-5e91-4fe2-b81c-92f7eaf20f62" event="http_request" latency_ms=14.21 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:12:35.893409357Z [INFO]  correlation_id="ca52b37c-5e91-4fe2-b81c-92f7eaf20f62" event="request_complete" latency_ms=16.62 status=200
+INFO:     100.64.0.5:32272 - "POST /v2/orders/sync HTTP/1.1" 200 OK
+2025-10-10T15:12:55.892595558Z [INFO]  correlation_id="639efe46-a3f3-4ec5-a7e1-89bc2217c18e" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:12:55.892606209Z [INFO]  correlation_id="639efe46-a3f3-4ec5-a7e1-89bc2217c18e" event="gateway_key_header" length=9 present=true
+2025-10-10T15:12:55.892612679Z [INFO]  correlation_id="639efe46-a3f3-4ec5-a7e1-89bc2217c18e" event="http_request" latency_ms=36.92 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:12:55.892618542Z [INFO]  correlation_id="639efe46-a3f3-4ec5-a7e1-89bc2217c18e" event="request_complete" latency_ms=38.48 status=403
+INFO:     100.64.0.2:52600 - "POST /v2/orders HTTP/1.1" 403 Forbidden
+2025-10-10T15:12:55.892631325Z [INFO]  correlation_id="2d55ec6a-7261-4c94-b99e-90f1a51e96c1" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:12:55.892637786Z [INFO]  correlation_id="2d55ec6a-7261-4c94-b99e-90f1a51e96c1" event="gateway_key_header" length=9 present=true
+2025-10-10T15:12:55.892644204Z [INFO]  correlation_id="2d55ec6a-7261-4c94-b99e-90f1a51e96c1" event="http_request" latency_ms=16.97 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:12:55.892650451Z [INFO]  correlation_id="2d55ec6a-7261-4c94-b99e-90f1a51e96c1" event="request_complete" latency_ms=26.75 status=403
+INFO:     100.64.0.2:52600 - "POST /v2/orders HTTP/1.1" 403 Forbidden
+2025-10-10T15:13:15.893876850Z [INFO]  correlation_id="1ae10410-6ce1-421b-bc25-2e58eb0197d4" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:13:15.893886953Z [INFO]  correlation_id="1ae10410-6ce1-421b-bc25-2e58eb0197d4" event="gateway_key_header" length=9 present=true
+2025-10-10T15:13:15.893892966Z [INFO]  correlation_id="1ae10410-6ce1-421b-bc25-2e58eb0197d4" event="http_request" latency_ms=38.38 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:13:15.893899834Z [INFO]  correlation_id="1ae10410-6ce1-421b-bc25-2e58eb0197d4" event="request_complete" latency_ms=40.04 status=200
+INFO:     100.64.0.9:11632 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T15:13:35.866340865Z [INFO]  correlation_id="6bf74f9a-7c07-4698-a4f1-811164d52cda" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:13:35.866347203Z [INFO]  correlation_id="6bf74f9a-7c07-4698-a4f1-811164d52cda" event="gateway_key_header" length=9 present=true
+2025-10-10T15:13:35.866353164Z [INFO]  correlation_id="6bf74f9a-7c07-4698-a4f1-811164d52cda" event="http_request" latency_ms=11.6 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+INFO:     100.64.0.6:15774 - "POST /v2/orders HTTP/1.1" 403 Forbidden
+2025-10-10T15:13:35.866371769Z [INFO]  correlation_id="6bf74f9a-7c07-4698-a4f1-811164d52cda" event="request_complete" latency_ms=14.07 status=403
+2025-10-10T15:13:35.866380595Z [INFO]  correlation_id="a85f0b41-f7db-4c7f-837b-00cb171b0466" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:13:35.866386173Z [INFO]  correlation_id="a85f0b41-f7db-4c7f-837b-00cb171b0466" event="gateway_key_header" length=9 present=true
+2025-10-10T15:13:35.866391964Z [INFO]  correlation_id="a85f0b41-f7db-4c7f-837b-00cb171b0466" event="http_request" latency_ms=11.29 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:13:35.866398648Z [INFO]  correlation_id="a85f0b41-f7db-4c7f-837b-00cb171b0466" event="request_complete" latency_ms=12.93 status=403
+INFO:     100.64.0.6:15774 - "POST /v2/orders HTTP/1.1" 403 Forbidden
+2025-10-10T15:20:46.159827012Z [INFO]  correlation_id="9090c13f-006e-48e0-908c-dc61329a97cd" event="incoming_request" method="GET" path="/v2/orders"
+2025-10-10T15:20:46.159832924Z [INFO]  correlation_id="9090c13f-006e-48e0-908c-dc61329a97cd" event="gateway_key_header" length=9 present=true
+2025-10-10T15:20:46.161993394Z [INFO]  correlation_id="9090c13f-006e-48e0-908c-dc61329a97cd" event="http_request" latency_ms=27.37 method="GET" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:20:46.162041407Z [INFO]  correlation_id="9090c13f-006e-48e0-908c-dc61329a97cd" event="request_complete" latency_ms=29.57 status=200
+INFO:     100.64.0.10:14122 - "GET /v2/orders HTTP/1.1" 200 OK
+2025-10-10T15:24:06.250345709Z [INFO]  correlation_id="44026c40-eb92-4ff7-89f6-a0011e12c6be" event="incoming_request" method="DELETE" path="/v2/orders/39ec108b-4309-41b5-b5e5-5065f60be5b4"
+2025-10-10T15:24:06.250350132Z [INFO]  correlation_id="44026c40-eb92-4ff7-89f6-a0011e12c6be" event="gateway_key_header" length=9 present=true
+2025-10-10T15:24:06.250354344Z [INFO]  correlation_id="44026c40-eb92-4ff7-89f6-a0011e12c6be" event="http_request" latency_ms=26.03 method="DELETE" status=204 url="https://api.alpaca.markets/v2/orders/39ec108b-4309-41b5-b5e5-5065f60be5b4"
+2025-10-10T15:24:06.250358553Z [INFO]  correlation_id="44026c40-eb92-4ff7-89f6-a0011e12c6be" event="request_complete" latency_ms=27.66 status=204
+INFO:     100.64.0.11:29532 - "DELETE /v2/orders/39ec108b-4309-41b5-b5e5-5065f60be5b4 HTTP/1.1" 204 No Content
+2025-10-10T15:24:26.252243661Z [INFO]  correlation_id="0a113490-4de5-4fb8-a2a7-56f7fdb375c7" event="incoming_request" method="DELETE" path="/v2/orders/8356ad17-ad0d-4e52-b5de-03f66c46b093"
+2025-10-10T15:24:26.252251108Z [INFO]  correlation_id="0a113490-4de5-4fb8-a2a7-56f7fdb375c7" event="gateway_key_header" length=9 present=true
+2025-10-10T15:24:26.252256746Z [INFO]  correlation_id="0a113490-4de5-4fb8-a2a7-56f7fdb375c7" event="http_request" latency_ms=11.07 method="DELETE" status=204 url="https://api.alpaca.markets/v2/orders/8356ad17-ad0d-4e52-b5de-03f66c46b093"
+2025-10-10T15:24:26.252261879Z [INFO]  correlation_id="0a113490-4de5-4fb8-a2a7-56f7fdb375c7" event="request_complete" latency_ms=14.14 status=204
+INFO:     100.64.0.10:40006 - "DELETE /v2/orders/8356ad17-ad0d-4e52-b5de-03f66c46b093 HTTP/1.1" 204 No Content
+2025-10-10T15:55:47.552322873Z [INFO]  correlation_id="3717ebb7-82e5-49ec-bb80-8457b1c26c0a" event="incoming_request" method="GET" path="/v2/orders"
+2025-10-10T15:55:47.552332626Z [INFO]  correlation_id="3717ebb7-82e5-49ec-bb80-8457b1c26c0a" event="gateway_key_header" length=9 present=true
+2025-10-10T15:55:47.552339829Z [INFO]  correlation_id="3717ebb7-82e5-49ec-bb80-8457b1c26c0a" event="http_request" latency_ms=41.02 method="GET" status=200 url="https://api.alpaca.markets/v2/orders"
+INFO:     100.64.0.12:13946 - "GET /v2/orders HTTP/1.1" 200 OK
+2025-10-10T15:55:47.552353743Z [INFO]  correlation_id="3717ebb7-82e5-49ec-bb80-8457b1c26c0a" event="request_complete" latency_ms=42.19 status=200
+2025-10-10T15:56:17.562065655Z [INFO]  correlation_id="2b1f1314-4cfa-434e-9901-1bd71fc7cbfd" event="incoming_request" method="DELETE" path="/v2/orders/31903f4d-f6d3-4b08-8555-31cd310a81e5"
+2025-10-10T15:56:17.562075067Z [INFO]  correlation_id="2b1f1314-4cfa-434e-9901-1bd71fc7cbfd" event="gateway_key_header" length=9 present=true
+2025-10-10T15:56:17.562082348Z [INFO]  correlation_id="2b1f1314-4cfa-434e-9901-1bd71fc7cbfd" event="http_request" latency_ms=28.22 method="DELETE" status=204 url="https://api.alpaca.markets/v2/orders/31903f4d-f6d3-4b08-8555-31cd310a81e5"
+2025-10-10T15:56:17.562089236Z [INFO]  correlation_id="2b1f1314-4cfa-434e-9901-1bd71fc7cbfd" event="request_complete" latency_ms=29.09 status=204
+INFO:     100.64.0.12:11306 - "DELETE /v2/orders/31903f4d-f6d3-4b08-8555-31cd310a81e5 HTTP/1.1" 204 No Content
+2025-10-10T15:56:17.765108870Z [INFO]  correlation_id="837396b8-2e10-43c5-abdd-f2066607ceed" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:56:17.765115208Z [INFO]  correlation_id="837396b8-2e10-43c5-abdd-f2066607ceed" event="gateway_key_header" length=9 present=true
+2025-10-10T15:56:17.779486254Z [INFO]  correlation_id="837396b8-2e10-43c5-abdd-f2066607ceed" event="http_request" latency_ms=15.75 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:56:17.779496632Z [INFO]  correlation_id="837396b8-2e10-43c5-abdd-f2066607ceed" event="request_complete" latency_ms=17.78 status=200
+INFO:     100.64.0.13:41008 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T15:58:17.819633928Z [INFO]  correlation_id="e3ccfa4b-4a50-4aad-8000-9d8439eee6a8" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:58:17.819640762Z [INFO]  correlation_id="e3ccfa4b-4a50-4aad-8000-9d8439eee6a8" event="gateway_key_header" length=9 present=true
+2025-10-10T15:58:17.819649071Z [INFO]  correlation_id="e3ccfa4b-4a50-4aad-8000-9d8439eee6a8" event="http_request" latency_ms=28.32 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:58:17.819655772Z [INFO]  correlation_id="e3ccfa4b-4a50-4aad-8000-9d8439eee6a8" event="request_complete" latency_ms=29.75 status=200
+INFO:     100.64.0.12:11330 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T15:58:17.819669102Z [INFO]  correlation_id="f33afa03-0218-44e8-8890-906d628efca1" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:58:17.819675681Z [INFO]  correlation_id="f33afa03-0218-44e8-8890-906d628efca1" event="gateway_key_header" length=9 present=true
+2025-10-10T15:58:17.819684219Z [INFO]  correlation_id="f33afa03-0218-44e8-8890-906d628efca1" event="http_request" latency_ms=14.79 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:58:17.819690976Z [INFO]  correlation_id="f33afa03-0218-44e8-8890-906d628efca1" event="request_complete" latency_ms=16.38 status=200
+INFO:     100.64.0.14:15776 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T15:58:17.819704956Z [INFO]  correlation_id="255ad24e-3316-4446-8177-1dcac6b55ec6" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:58:17.819711281Z [INFO]  correlation_id="255ad24e-3316-4446-8177-1dcac6b55ec6" event="gateway_key_header" length=9 present=true
+2025-10-10T15:58:17.819717979Z [INFO]  correlation_id="255ad24e-3316-4446-8177-1dcac6b55ec6" event="http_request" latency_ms=14.5 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:58:17.819733193Z [INFO]  correlation_id="255ad24e-3316-4446-8177-1dcac6b55ec6" event="request_complete" latency_ms=16.78 status=200
+INFO:     100.64.0.15:24724 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T15:58:17.819747072Z [INFO]  correlation_id="47f4cb3f-aac9-430d-9155-053c4b7897b9" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-10T15:58:17.819753508Z [INFO]  correlation_id="47f4cb3f-aac9-430d-9155-053c4b7897b9" event="gateway_key_header" length=9 present=true
+2025-10-10T15:58:17.819760006Z [INFO]  correlation_id="47f4cb3f-aac9-430d-9155-053c4b7897b9" event="http_request" latency_ms=16.39 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-10T15:58:17.819766498Z [INFO]  correlation_id="47f4cb3f-aac9-430d-9155-053c4b7897b9" event="request_complete" latency_ms=19.05 status=200
+INFO:     100.64.0.15:24724 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-10T19:25:04.800334971Z [INFO]  correlation_id="e74ff130-b206-4645-a348-eb16cd84ddea" event="incoming_request" method="GET" path="/v2/positions"
+2025-10-10T19:25:04.800344946Z [INFO]  correlation_id="e74ff130-b206-4645-a348-eb16cd84ddea" event="gateway_key_header" length=9 present=true
+2025-10-10T19:25:04.800352045Z [INFO]  correlation_id="e74ff130-b206-4645-a348-eb16cd84ddea" event="http_request" latency_ms=23.93 method="GET" status=200 url="https://api.alpaca.markets/v2/positions"
+2025-10-10T19:25:04.800357349Z [INFO]  correlation_id="e74ff130-b206-4645-a348-eb16cd84ddea" event="request_complete" latency_ms=24.81 status=200
+INFO:     100.64.0.10:32934 - "GET /v2/positions HTTP/1.1" 200 OK
+2025-10-10T20:43:27.564022995Z [INFO]  correlation_id="9813764f-94f3-45ff-ac5e-5c51f17c714c" event="incoming_request" method="GET" path="/.well-known/openapi.json"
+2025-10-10T20:43:27.564030361Z [INFO]  correlation_id="9813764f-94f3-45ff-ac5e-5c51f17c714c" event="gateway_key_header" length=0 present=false
+2025-10-10T20:43:27.564039493Z [INFO]  correlation_id="9813764f-94f3-45ff-ac5e-5c51f17c714c" event="request_complete" latency_ms=51.26 status=200
+INFO:     100.64.0.5:12696 - "GET /.well-known/openapi.json HTTP/1.1" 200 OK
+2025-10-10T20:54:18.033624536Z [INFO]  correlation_id="6a6f7420-00e9-426e-b20a-6a902a7ca19a" event="incoming_request" method="GET" path="/.well-known/openapi.json"
+2025-10-10T20:54:18.033634535Z [INFO]  correlation_id="6a6f7420-00e9-426e-b20a-6a902a7ca19a" event="gateway_key_header" length=0 present=false
+INFO:     100.64.0.4:28050 - "GET /.well-known/openapi.json HTTP/1.1" 200 OK
+2025-10-10T20:54:18.033648679Z [INFO]  correlation_id="6a6f7420-00e9-426e-b20a-6a902a7ca19a" event="request_complete" latency_ms=23.86 status=200
+2025-10-10T20:55:38.063790905Z [INFO]  correlation_id="2c069ebf-6be7-4875-a241-ea06682ff376" event="incoming_request" method="GET" path="/.well-known/openapi.json"
+2025-10-10T20:55:38.063798626Z [INFO]  correlation_id="2c069ebf-6be7-4875-a241-ea06682ff376" event="gateway_key_header" length=0 present=false
+INFO:     100.64.0.7:10376 - "GET /.well-known/openapi.json HTTP/1.1" 200 OK
+2025-10-10T20:55:38.063811680Z [INFO]  correlation_id="2c069ebf-6be7-4875-a241-ea06682ff376" event="request_complete" latency_ms=29.85 status=200
+2025-10-11T21:34:28.437386521Z [INFO]  correlation_id="45331258-0a2c-4e8c-9a1f-2c199d2fecbd" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T21:34:28.437393859Z [INFO]  correlation_id="45331258-0a2c-4e8c-9a1f-2c199d2fecbd" event="gateway_key_header" length=9 present=true
+2025-10-11T21:34:28.437399074Z [INFO]  correlation_id="45331258-0a2c-4e8c-9a1f-2c199d2fecbd" event="request_complete" latency_ms=0.94 status=200
+INFO:     100.64.0.4:54840 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-11T21:47:38.816965583Z [INFO]  correlation_id="57ec2d2a-0dd3-4852-8482-5013c1a24fc0" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T21:47:38.816975514Z [INFO]  correlation_id="57ec2d2a-0dd3-4852-8482-5013c1a24fc0" event="gateway_key_header" length=9 present=true
+2025-10-11T21:47:38.816981806Z [INFO]  correlation_id="57ec2d2a-0dd3-4852-8482-5013c1a24fc0" event="request_complete" latency_ms=0.84 status=200
+INFO:     100.64.0.7:53084 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-11T22:15:59.678136246Z [INFO]  correlation_id="c55832cb-d70b-43b5-99e2-385c193c189d" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T22:15:59.678145904Z [INFO]  correlation_id="c55832cb-d70b-43b5-99e2-385c193c189d" event="gateway_key_header" length=9 present=true
+2025-10-11T22:15:59.678152741Z [INFO]  correlation_id="c55832cb-d70b-43b5-99e2-385c193c189d" event="request_complete" latency_ms=0.82 status=200
+INFO:     100.64.0.8:11084 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-11T22:23:39.960440174Z [INFO]  correlation_id="68cd33b1-9093-4bbc-91cb-6212cd954914" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T22:23:39.960446761Z [INFO]  correlation_id="68cd33b1-9093-4bbc-91cb-6212cd954914" event="gateway_key_header" length=9 present=true
+2025-10-11T22:23:39.960451660Z [INFO]  correlation_id="68cd33b1-9093-4bbc-91cb-6212cd954914" event="request_complete" latency_ms=1.12 status=200
+INFO:     100.64.0.2:37264 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-11T22:28:10.072149901Z [INFO]  correlation_id="5e23102a-254c-4abe-89b4-3c61e64e22f4" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T22:28:10.072240381Z [INFO]  correlation_id="5e23102a-254c-4abe-89b4-3c61e64e22f4" event="gateway_key_header" length=9 present=true
+2025-10-11T22:28:10.072250748Z [INFO]  correlation_id="5e23102a-254c-4abe-89b4-3c61e64e22f4" event="request_complete" latency_ms=0.86 status=200
+INFO:     100.64.0.5:59086 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-11T22:57:00.972237083Z [INFO]  correlation_id="2dfbff81-ad43-46d7-aab2-ddd0243743dd" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T22:57:00.972246063Z [INFO]  correlation_id="2dfbff81-ad43-46d7-aab2-ddd0243743dd" event="gateway_key_header" length=9 present=true
+2025-10-11T22:57:00.972252119Z [INFO]  correlation_id="2dfbff81-ad43-46d7-aab2-ddd0243743dd" event="request_complete" latency_ms=0.81 status=200
+INFO:     100.64.0.4:24732 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-11T22:58:20.992153711Z [INFO]  correlation_id="b6dac553-febc-4ac7-9e39-2df8efc79422" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T22:58:20.992160597Z [INFO]  correlation_id="b6dac553-febc-4ac7-9e39-2df8efc79422" event="gateway_key_header" length=9 present=true
+2025-10-11T22:58:20.992165623Z [INFO]  correlation_id="b6dac553-febc-4ac7-9e39-2df8efc79422" event="request_complete" latency_ms=0.82 status=200
+INFO:     100.64.0.2:61782 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-11T22:59:21.004648196Z [INFO]  correlation_id="da4d81a3-bf55-4b20-96f9-42cc6111b556" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T22:59:21.004657017Z [INFO]  correlation_id="da4d81a3-bf55-4b20-96f9-42cc6111b556" event="gateway_key_header" length=9 present=true
+2025-10-11T22:59:21.004664269Z [INFO]  correlation_id="da4d81a3-bf55-4b20-96f9-42cc6111b556" event="request_complete" latency_ms=0.82 status=200
+INFO:     100.64.0.6:27910 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-11T23:01:21.035245425Z [INFO]  correlation_id="88f974d9-6a40-4719-850c-f1c7d9bc8773" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T23:01:21.035252130Z [INFO]  correlation_id="88f974d9-6a40-4719-850c-f1c7d9bc8773" event="gateway_key_header" length=9 present=true
+2025-10-11T23:01:21.035257053Z [INFO]  correlation_id="88f974d9-6a40-4719-850c-f1c7d9bc8773" event="request_complete" latency_ms=0.7 status=200
+INFO:     100.64.0.2:51550 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-11T23:02:31.041690609Z [INFO]  correlation_id="dc740319-85be-4feb-8308-19d2835dec5e" event="incoming_request" method="GET" path="/healthz"
+2025-10-11T23:02:31.041699239Z [INFO]  correlation_id="dc740319-85be-4feb-8308-19d2835dec5e" event="gateway_key_header" length=9 present=true
+2025-10-11T23:02:31.041706734Z [INFO]  correlation_id="dc740319-85be-4feb-8308-19d2835dec5e" event="request_complete" latency_ms=1.03 status=200
+INFO:     100.64.0.7:59376 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:31:13.789384518Z [INFO]  correlation_id="6f6f2750-f400-44b1-92bc-f671fa164ea6" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T00:31:13.789394232Z [INFO]  correlation_id="6f6f2750-f400-44b1-92bc-f671fa164ea6" event="gateway_key_header" length=9 present=true
+2025-10-12T00:31:13.789402913Z [INFO]  correlation_id="6f6f2750-f400-44b1-92bc-f671fa164ea6" event="request_complete" latency_ms=0.85 status=200
+INFO:     100.64.0.3:18546 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:32:23.809799641Z [INFO]  correlation_id="fceac64c-775f-49d2-9fcf-8d5c4f5ffe47" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T00:32:23.809805757Z [INFO]  correlation_id="fceac64c-775f-49d2-9fcf-8d5c4f5ffe47" event="gateway_key_header" length=9 present=true
+2025-10-12T00:32:23.809811810Z [INFO]  correlation_id="fceac64c-775f-49d2-9fcf-8d5c4f5ffe47" event="request_complete" latency_ms=0.87 status=200
+INFO:     100.64.0.2:41018 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:34:43.846895128Z [INFO]  correlation_id="a36e8fe4-dad6-4acd-add2-940fcd8ed723" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T00:34:43.846905187Z [INFO]  correlation_id="a36e8fe4-dad6-4acd-add2-940fcd8ed723" event="gateway_key_header" length=9 present=true
+2025-10-12T00:34:43.846921280Z [INFO]  correlation_id="a36e8fe4-dad6-4acd-add2-940fcd8ed723" event="request_complete" latency_ms=0.96 status=200
+INFO:     100.64.0.8:33778 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:40:33.998041222Z [INFO]  correlation_id="f2378f79-6c0f-49b0-a538-a3287b5326ee" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T00:40:33.998049241Z [INFO]  correlation_id="f2378f79-6c0f-49b0-a538-a3287b5326ee" event="gateway_key_header" length=9 present=true
+2025-10-12T00:40:33.998054124Z [INFO]  correlation_id="f2378f79-6c0f-49b0-a538-a3287b5326ee" event="request_complete" latency_ms=0.98 status=200
+INFO:     100.64.0.2:57360 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:47:54.189134863Z [INFO]  correlation_id="a59c1d97-d889-4343-87e3-b4323b67e39e" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T00:47:54.189144792Z [INFO]  correlation_id="a59c1d97-d889-4343-87e3-b4323b67e39e" event="gateway_key_header" length=9 present=true
+2025-10-12T00:47:54.189151800Z [INFO]  correlation_id="a59c1d97-d889-4343-87e3-b4323b67e39e" event="request_complete" latency_ms=1.04 status=200
+INFO:     100.64.0.2:18980 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:48:44.219876358Z [INFO]  correlation_id="64d01a12-6933-4d0d-9449-db7a2c627419" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T00:48:44.219884367Z [INFO]  correlation_id="64d01a12-6933-4d0d-9449-db7a2c627419" event="gateway_key_header" length=9 present=true
+2025-10-12T00:48:44.219890210Z [INFO]  correlation_id="64d01a12-6933-4d0d-9449-db7a2c627419" event="request_complete" latency_ms=0.77 status=200
+INFO:     100.64.0.9:27710 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:51:04.271000614Z [INFO]  correlation_id="d6731d58-0d93-4a3f-81b7-823d60394f9e" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T00:51:04.271007788Z [INFO]  correlation_id="d6731d58-0d93-4a3f-81b7-823d60394f9e" event="gateway_key_header" length=9 present=true
+2025-10-12T00:51:04.271013052Z [INFO]  correlation_id="d6731d58-0d93-4a3f-81b7-823d60394f9e" event="request_complete" latency_ms=1.11 status=200
+INFO:     100.64.0.5:40590 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:51:04.271022083Z [INFO]  correlation_id="51a9000f-9137-41bb-8f85-b1af5469de7f" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T00:51:04.271026266Z [INFO]  correlation_id="51a9000f-9137-41bb-8f85-b1af5469de7f" event="gateway_key_header" length=9 present=true
+2025-10-12T00:51:04.271030274Z [INFO]  correlation_id="51a9000f-9137-41bb-8f85-b1af5469de7f" event="request_complete" latency_ms=1.02 status=200
+INFO:     100.64.0.5:40590 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:56:54.393128311Z [INFO]  correlation_id="c9cf76b0-c7d6-49d4-b8bf-37c5655714fb" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T00:56:54.393135231Z [INFO]  correlation_id="c9cf76b0-c7d6-49d4-b8bf-37c5655714fb" event="gateway_key_header" length=9 present=true
+INFO:     100.64.0.4:62402 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T00:56:54.393144396Z [INFO]  correlation_id="c9cf76b0-c7d6-49d4-b8bf-37c5655714fb" event="request_complete" latency_ms=0.93 status=200
+2025-10-12T07:47:38.051241250Z [INFO]  correlation_id="52b19469-b650-47a0-a1fb-accdb42be993" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T07:47:38.051248050Z [INFO]  correlation_id="52b19469-b650-47a0-a1fb-accdb42be993" event="gateway_key_header" length=9 present=true
+2025-10-12T07:47:38.051252455Z [INFO]  correlation_id="52b19469-b650-47a0-a1fb-accdb42be993" event="request_complete" latency_ms=0.85 status=200
+INFO:     100.64.0.2:46958 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T15:30:33.266667362Z [INFO]  correlation_id="6a6eb7b2-1b3f-4675-989c-078159693308" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T15:30:33.266676585Z [INFO]  correlation_id="6a6eb7b2-1b3f-4675-989c-078159693308" event="gateway_key_header" length=9 present=true
+INFO:     100.64.0.2:23286 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T15:30:33.266688950Z [INFO]  correlation_id="6a6eb7b2-1b3f-4675-989c-078159693308" event="request_complete" latency_ms=1.13 status=200
+2025-10-12T15:47:33.801916144Z [INFO]  correlation_id="d5d87be1-30c5-4318-8de6-deda5a56e58e" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T15:47:33.801925972Z [INFO]  correlation_id="d5d87be1-30c5-4318-8de6-deda5a56e58e" event="gateway_key_header" length=9 present=true
+2025-10-12T15:47:33.801932254Z [INFO]  correlation_id="d5d87be1-30c5-4318-8de6-deda5a56e58e" event="request_complete" latency_ms=0.84 status=200
+INFO:     100.64.0.5:28904 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T15:48:13.804491363Z [INFO]  correlation_id="40f54214-e6b6-4ad6-b9ab-2f4ca3077601" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T15:48:13.804501503Z [INFO]  correlation_id="40f54214-e6b6-4ad6-b9ab-2f4ca3077601" event="gateway_key_header" length=9 present=true
+2025-10-12T15:48:13.804508021Z [INFO]  correlation_id="40f54214-e6b6-4ad6-b9ab-2f4ca3077601" event="request_complete" latency_ms=0.74 status=200
+INFO:     100.64.0.9:16570 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T17:31:46.856601288Z [INFO]  correlation_id="5f51ec61-7fc5-4378-bd6d-bb152e844592" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T17:31:46.856607893Z [INFO]  correlation_id="5f51ec61-7fc5-4378-bd6d-bb152e844592" event="gateway_key_header" length=9 present=true
+2025-10-12T17:31:46.856612189Z [INFO]  correlation_id="5f51ec61-7fc5-4378-bd6d-bb152e844592" event="request_complete" latency_ms=0.67 status=200
+INFO:     100.64.0.9:50392 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T17:31:46.856620893Z [INFO]  correlation_id="c0ce515f-a53f-4c38-8d44-ec06dccfb0e0" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T17:31:46.856628294Z [INFO]  correlation_id="c0ce515f-a53f-4c38-8d44-ec06dccfb0e0" event="gateway_key_header" length=9 present=true
+2025-10-12T17:31:46.856632244Z [INFO]  correlation_id="c0ce515f-a53f-4c38-8d44-ec06dccfb0e0" event="request_complete" latency_ms=1.37 status=200
+INFO:     100.64.0.9:50392 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T17:43:07.246094480Z [INFO]  correlation_id="6bcfba0a-9f81-4a96-bfec-07a100193a88" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T17:43:07.246101213Z [INFO]  correlation_id="6bcfba0a-9f81-4a96-bfec-07a100193a88" event="gateway_key_header" length=9 present=true
+2025-10-12T17:43:07.246105761Z [INFO]  correlation_id="6bcfba0a-9f81-4a96-bfec-07a100193a88" event="request_complete" latency_ms=0.95 status=200
+INFO:     100.64.0.2:11966 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T17:43:09.049078253Z [INFO]  correlation_id="9dd2e662-224d-4a90-9e3b-e383ee44dfbd" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T17:43:09.049087788Z [INFO]  correlation_id="9dd2e662-224d-4a90-9e3b-e383ee44dfbd" event="gateway_key_header" length=9 present=true
+2025-10-12T17:43:09.049093661Z [INFO]  correlation_id="9dd2e662-224d-4a90-9e3b-e383ee44dfbd" event="request_complete" latency_ms=0.79 status=200
+INFO:     100.64.0.3:50646 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T17:43:39.056166720Z [INFO]  correlation_id="48eb22c7-cef1-42ed-98d9-9e70f36af336" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T17:43:39.056175288Z [INFO]  correlation_id="48eb22c7-cef1-42ed-98d9-9e70f36af336" event="gateway_key_header" length=9 present=true
+2025-10-12T17:43:39.056181597Z [INFO]  correlation_id="48eb22c7-cef1-42ed-98d9-9e70f36af336" event="request_complete" latency_ms=0.87 status=200
+INFO:     100.64.0.3:39914 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T17:58:39.481029184Z [INFO]  correlation_id="635c1504-4d37-4a99-b41d-cd8e6d5ac947" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T17:58:39.481040852Z [INFO]  correlation_id="635c1504-4d37-4a99-b41d-cd8e6d5ac947" event="gateway_key_header" length=9 present=true
+2025-10-12T17:58:39.481049627Z [INFO]  correlation_id="635c1504-4d37-4a99-b41d-cd8e6d5ac947" event="request_complete" latency_ms=0.69 status=200
+INFO:     100.64.0.9:32590 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T17:59:59.494687542Z [INFO]  correlation_id="7e39e15c-bc8b-490f-b689-5be80f7f2ca1" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T17:59:59.494695491Z [INFO]  correlation_id="7e39e15c-bc8b-490f-b689-5be80f7f2ca1" event="gateway_key_header" length=9 present=true
+2025-10-12T17:59:59.494701716Z [INFO]  correlation_id="7e39e15c-bc8b-490f-b689-5be80f7f2ca1" event="request_complete" latency_ms=0.85 status=200
+INFO:     100.64.0.6:59858 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T18:01:29.530314571Z [INFO]  correlation_id="2e6794db-10bb-45b8-91c1-7c1718a22373" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T18:01:29.530323586Z [INFO]  correlation_id="2e6794db-10bb-45b8-91c1-7c1718a22373" event="gateway_key_header" length=9 present=true
+2025-10-12T18:01:29.530329777Z [INFO]  correlation_id="2e6794db-10bb-45b8-91c1-7c1718a22373" event="request_complete" latency_ms=1.13 status=200
+INFO:     100.64.0.7:18536 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T18:02:39.563280643Z [INFO]  correlation_id="f25da23a-6722-4a97-a097-f97c9bdecb11" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T18:02:39.563287040Z [INFO]  correlation_id="f25da23a-6722-4a97-a097-f97c9bdecb11" event="gateway_key_header" length=9 present=true
+2025-10-12T18:02:39.563291504Z [INFO]  correlation_id="f25da23a-6722-4a97-a097-f97c9bdecb11" event="request_complete" latency_ms=0.68 status=200
+INFO:     100.64.0.6:12446 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T18:03:49.585579609Z [INFO]  correlation_id="1ed2ac90-ae15-4639-91d8-d96e9d8786b4" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T18:03:49.585589874Z [INFO]  correlation_id="1ed2ac90-ae15-4639-91d8-d96e9d8786b4" event="gateway_key_header" length=9 present=true
+2025-10-12T18:03:49.585596234Z [INFO]  correlation_id="1ed2ac90-ae15-4639-91d8-d96e9d8786b4" event="request_complete" latency_ms=0.89 status=200
+INFO:     100.64.0.5:23096 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T18:04:49.602441550Z [INFO]  correlation_id="e7b142ff-08bd-4541-b030-489a737e109f" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T18:04:49.602448557Z [INFO]  correlation_id="e7b142ff-08bd-4541-b030-489a737e109f" event="gateway_key_header" length=9 present=true
+2025-10-12T18:04:49.602452989Z [INFO]  correlation_id="e7b142ff-08bd-4541-b030-489a737e109f" event="request_complete" latency_ms=0.98 status=200
+INFO:     100.64.0.8:23552 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T18:05:19.587558876Z [INFO]  correlation_id="3b960735-f9cf-4d1d-b134-0852847a125d" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T18:05:19.587564825Z [INFO]  correlation_id="3b960735-f9cf-4d1d-b134-0852847a125d" event="gateway_key_header" length=9 present=true
+2025-10-12T18:05:19.587569042Z [INFO]  correlation_id="3b960735-f9cf-4d1d-b134-0852847a125d" event="request_complete" latency_ms=1.16 status=200
+INFO:     100.64.0.3:32146 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T18:13:29.966648613Z [INFO]  correlation_id="b7a642a0-f852-4539-b094-46a5659129e2" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T18:13:29.966655196Z [INFO]  correlation_id="b7a642a0-f852-4539-b094-46a5659129e2" event="gateway_key_header" length=9 present=true
+2025-10-12T18:13:29.966661607Z [INFO]  correlation_id="b7a642a0-f852-4539-b094-46a5659129e2" event="request_complete" latency_ms=3.5 status=200
+INFO:     100.64.0.8:46296 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T19:21:22.175226214Z [INFO]  correlation_id="9b7f0d46-c387-46b6-9249-88e8503544ad" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T19:21:22.175231138Z [INFO]  correlation_id="9b7f0d46-c387-46b6-9249-88e8503544ad" event="gateway_key_header" length=9 present=true
+2025-10-12T19:21:22.175235545Z [INFO]  correlation_id="9b7f0d46-c387-46b6-9249-88e8503544ad" event="request_complete" latency_ms=1.3 status=200
+INFO:     100.64.0.4:51004 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T19:46:42.834738749Z [INFO]  correlation_id="1d398733-11c3-424a-8db5-3f85fe669c06" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T19:46:42.834751748Z [INFO]  correlation_id="1d398733-11c3-424a-8db5-3f85fe669c06" event="gateway_key_header" length=9 present=true
+2025-10-12T19:46:42.834758890Z [INFO]  correlation_id="1d398733-11c3-424a-8db5-3f85fe669c06" event="request_complete" latency_ms=1.12 status=200
+INFO:     100.64.0.4:57594 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T20:38:44.393574078Z [INFO]  correlation_id="1499e946-7c5e-43de-a7a8-caa51697ca7b" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T20:38:44.393585585Z [INFO]  correlation_id="1499e946-7c5e-43de-a7a8-caa51697ca7b" event="gateway_key_header" length=9 present=true
+2025-10-12T20:38:44.393592978Z [INFO]  correlation_id="1499e946-7c5e-43de-a7a8-caa51697ca7b" event="request_complete" latency_ms=1.16 status=200
+INFO:     100.64.0.6:52464 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T20:39:04.387137588Z [INFO]  correlation_id="50c700b6-4efd-4768-acd8-0847e0a5bfb6" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T20:39:04.387146560Z [INFO]  correlation_id="50c700b6-4efd-4768-acd8-0847e0a5bfb6" event="gateway_key_header" length=9 present=true
+2025-10-12T20:39:04.387153114Z [INFO]  correlation_id="50c700b6-4efd-4768-acd8-0847e0a5bfb6" event="request_complete" latency_ms=0.71 status=200
+INFO:     100.64.0.9:22368 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T21:30:35.844615994Z [INFO]  correlation_id="eed7495e-829f-47f9-a866-e704707c468a" event="incoming_request" method="GET" path="/healthz"
+2025-10-12T21:30:35.844622724Z [INFO]  correlation_id="eed7495e-829f-47f9-a866-e704707c468a" event="gateway_key_header" length=9 present=true
+2025-10-12T21:30:35.844627643Z [INFO]  correlation_id="eed7495e-829f-47f9-a866-e704707c468a" event="request_complete" latency_ms=0.91 status=200
+INFO:     100.64.0.3:52042 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-12T23:20:09.563528898Z [INFO]  correlation_id="6f5e50f8-e392-4986-854b-cc469fbbef8f" event="incoming_request" method="GET" path="/.well-known/openapi.json"
+2025-10-12T23:20:09.563534901Z [INFO]  correlation_id="6f5e50f8-e392-4986-854b-cc469fbbef8f" event="gateway_key_header" length=0 present=false
+2025-10-12T23:20:09.563540550Z [INFO]  correlation_id="6f5e50f8-e392-4986-854b-cc469fbbef8f" event="request_complete" latency_ms=29.57 status=200
+INFO:     100.64.0.8:23170 - "GET /.well-known/openapi.json HTTP/1.1" 200 OK
+2025-10-12T23:20:09.563551887Z [INFO]  correlation_id="68c928e9-cda1-4fd3-a429-83a49dd5196b" event="incoming_request" method="GET" path="/favicon.ico"
+2025-10-12T23:20:09.563559267Z [INFO]  correlation_id="68c928e9-cda1-4fd3-a429-83a49dd5196b" event="gateway_key_header" length=0 present=false
+2025-10-12T23:20:09.563565674Z [INFO]  correlation_id="68c928e9-cda1-4fd3-a429-83a49dd5196b" event="request_complete" latency_ms=0.7 status=404
+INFO:     100.64.0.8:23170 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2025-10-12T23:20:15.297316149Z [INFO]  correlation_id="dde6469b-9c29-41bf-8f98-d68193596b0e" event="incoming_request" method="GET" path="/.well-known/openapi.json"
+2025-10-12T23:20:15.297323707Z [INFO]  correlation_id="dde6469b-9c29-41bf-8f98-d68193596b0e" event="gateway_key_header" length=0 present=false
+2025-10-12T23:20:15.316106093Z [INFO]  correlation_id="dde6469b-9c29-41bf-8f98-d68193596b0e" event="request_complete" latency_ms=19.83 status=200
+INFO:     100.64.0.6:47934 - "GET /.well-known/openapi.json HTTP/1.1" 200 OK
+2025-10-12T23:20:15.424706056Z [INFO]  correlation_id="e0974cda-3856-44f2-a5fd-30dd74d31db2" event="incoming_request" method="GET" path="/favicon.ico"
+2025-10-12T23:20:15.424712940Z [INFO]  correlation_id="e0974cda-3856-44f2-a5fd-30dd74d31db2" event="gateway_key_header" length=0 present=false
+INFO:     100.64.0.6:47934 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2025-10-12T23:20:15.424728384Z [INFO]  correlation_id="e0974cda-3856-44f2-a5fd-30dd74d31db2" event="request_complete" latency_ms=0.64 status=404
+2025-10-12T23:20:23.309736546Z [INFO]  correlation_id="22b2bc02-f3e8-4ad6-9027-6240a03fa9fa" event="incoming_request" method="GET" path="/.well-known/openapi.json"
+2025-10-12T23:20:23.309744391Z [INFO]  correlation_id="22b2bc02-f3e8-4ad6-9027-6240a03fa9fa" event="gateway_key_header" length=0 present=false
+2025-10-12T23:20:23.319610288Z [INFO]  correlation_id="22b2bc02-f3e8-4ad6-9027-6240a03fa9fa" event="request_complete" latency_ms=18.66 status=200
+INFO:     100.64.0.9:58186 - "GET /.well-known/openapi.json HTTP/1.1" 200 OK
+2025-10-13T00:37:55.468212125Z [INFO]  correlation_id="ac46ea43-206e-4ea6-89e5-5eef199e228b" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T00:37:55.468226900Z [INFO]  correlation_id="ac46ea43-206e-4ea6-89e5-5eef199e228b" event="gateway_key_header" length=9 present=true
+2025-10-13T00:37:55.468234015Z [INFO]  correlation_id="ac46ea43-206e-4ea6-89e5-5eef199e228b" event="request_complete" latency_ms=0.93 status=200
+INFO:     100.64.0.8:12386 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T03:31:32.819352085Z [INFO]  correlation_id="3d039c45-0e62-4f75-8da0-de04b71ee23d" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T03:31:32.819357746Z [INFO]  correlation_id="3d039c45-0e62-4f75-8da0-de04b71ee23d" event="gateway_key_header" length=9 present=true
+2025-10-13T03:31:32.819363383Z [INFO]  correlation_id="3d039c45-0e62-4f75-8da0-de04b71ee23d" event="request_complete" latency_ms=0.94 status=200
+INFO:     100.64.0.4:23464 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T03:32:02.821579423Z [INFO]  correlation_id="f94c9ff0-dc64-416d-958a-a3d2e7c06213" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T03:32:02.821583543Z [INFO]  correlation_id="f94c9ff0-dc64-416d-958a-a3d2e7c06213" event="gateway_key_header" length=9 present=true
+2025-10-13T03:32:02.821587687Z [INFO]  correlation_id="f94c9ff0-dc64-416d-958a-a3d2e7c06213" event="request_complete" latency_ms=0.66 status=200
+INFO:     100.64.0.8:39898 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T03:35:42.948421982Z [INFO]  correlation_id="73d3fcd9-a668-440c-ac55-730e3ea7930d" event="incoming_request" method="GET" path="/apple-touch-icon.png"
+2025-10-13T03:35:42.948432135Z [INFO]  correlation_id="73d3fcd9-a668-440c-ac55-730e3ea7930d" event="gateway_key_header" length=0 present=false
+2025-10-13T03:35:42.948438597Z [INFO]  correlation_id="40a6eeba-0f96-4d63-b4fa-794222e9e2c8" event="incoming_request" method="GET" path="/apple-touch-icon-precomposed.png"
+2025-10-13T03:35:42.948444695Z [INFO]  correlation_id="40a6eeba-0f96-4d63-b4fa-794222e9e2c8" event="gateway_key_header" length=0 present=false
+2025-10-13T03:35:42.948452031Z [INFO]  correlation_id="b7a22804-4c2d-4eee-b36a-434c9c0a3e60" event="incoming_request" method="GET" path="/favicon.ico"
+2025-10-13T03:35:42.948457612Z [INFO]  correlation_id="b7a22804-4c2d-4eee-b36a-434c9c0a3e60" event="gateway_key_header" length=0 present=false
+2025-10-13T03:35:42.948464279Z [INFO]  correlation_id="73d3fcd9-a668-440c-ac55-730e3ea7930d" event="request_complete" latency_ms=1.07 status=404
+INFO:     100.64.0.6:44734 - "GET /apple-touch-icon.png HTTP/1.1" 404 Not Found
+2025-10-13T03:35:42.948475900Z [INFO]  correlation_id="40a6eeba-0f96-4d63-b4fa-794222e9e2c8" event="request_complete" latency_ms=0.87 status=404
+INFO:     100.64.0.6:44736 - "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 Not Found
+2025-10-13T03:35:42.948487775Z [INFO]  correlation_id="b7a22804-4c2d-4eee-b36a-434c9c0a3e60" event="request_complete" latency_ms=0.7 status=404
+INFO:     100.64.0.6:44788 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2025-10-13T03:35:42.948499932Z [INFO]  correlation_id="c1615052-8993-4678-a6a6-71610ed95316" event="incoming_request" method="GET" path="/.well-known/openapi.json"
+2025-10-13T03:35:42.948923081Z [INFO]  correlation_id="c1615052-8993-4678-a6a6-71610ed95316" event="request_complete" latency_ms=19.71 status=200
+INFO:     100.64.0.7:18856 - "GET /.well-known/openapi.json HTTP/1.1" 200 OK
+2025-10-13T03:35:42.948979591Z [INFO]  correlation_id="c1615052-8993-4678-a6a6-71610ed95316" event="gateway_key_header" length=0 present=false
+2025-10-13T03:35:50.488395215Z [INFO]  correlation_id="465c87aa-a475-4008-a5d3-39bccdd760a3" event="incoming_request" method="GET" path="/.well-known/openapi.json"
+2025-10-13T03:35:50.488405045Z [INFO]  correlation_id="465c87aa-a475-4008-a5d3-39bccdd760a3" event="gateway_key_header" length=0 present=false
+2025-10-13T03:35:50.509257056Z [INFO]  correlation_id="465c87aa-a475-4008-a5d3-39bccdd760a3" event="request_complete" latency_ms=19.87 status=200
+INFO:     100.64.0.5:36544 - "GET /.well-known/openapi.json HTTP/1.1" 200 OK
+2025-10-13T03:41:20.548977953Z [INFO]  correlation_id="e79ec4ef-c1cd-47ff-a153-1a81b46a4f7e" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T03:41:20.548984633Z [INFO]  correlation_id="e79ec4ef-c1cd-47ff-a153-1a81b46a4f7e" event="gateway_key_header" length=9 present=true
+2025-10-13T03:41:20.548989126Z [INFO]  correlation_id="e79ec4ef-c1cd-47ff-a153-1a81b46a4f7e" event="request_complete" latency_ms=3.1 status=200
+INFO:     100.64.0.5:45036 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T03:41:50.552391554Z [INFO]  correlation_id="b0be6c05-1efa-4268-9c6e-8d55c746a4cd" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T03:41:50.552400569Z [INFO]  correlation_id="b0be6c05-1efa-4268-9c6e-8d55c746a4cd" event="gateway_key_header" length=9 present=true
+2025-10-13T03:41:50.552406519Z [INFO]  correlation_id="b0be6c05-1efa-4268-9c6e-8d55c746a4cd" event="request_complete" latency_ms=0.86 status=200
+INFO:     100.64.0.7:34206 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T03:42:30.555409081Z [INFO]  correlation_id="577b89a6-147c-43d4-9267-eaa920185257" event="incoming_request" method="GET" path="/v2/positions"
+2025-10-13T03:42:30.555416711Z [INFO]  correlation_id="577b89a6-147c-43d4-9267-eaa920185257" event="gateway_key_header" length=9 present=true
+2025-10-13T03:42:30.555422144Z [INFO]  correlation_id="577b89a6-147c-43d4-9267-eaa920185257" event="http_request" latency_ms=21.94 method="GET" status=200 url="https://api.alpaca.markets/v2/positions"
+INFO:     100.64.0.5:36204 - "GET /v2/positions HTTP/1.1" 200 OK
+2025-10-13T03:42:30.555431716Z [INFO]  correlation_id="577b89a6-147c-43d4-9267-eaa920185257" event="request_complete" latency_ms=22.89 status=200
+2025-10-13T04:00:50.926555111Z [INFO]  correlation_id="bd98a7a1-a3c1-4d82-b3f6-8e721aaefc03" event="incoming_request" method="POST" path="/v2/watchlists"
+2025-10-13T04:00:50.926561068Z [INFO]  correlation_id="bd98a7a1-a3c1-4d82-b3f6-8e721aaefc03" event="gateway_key_header" length=9 present=true
+2025-10-13T04:00:50.926566479Z [INFO]  correlation_id="bd98a7a1-a3c1-4d82-b3f6-8e721aaefc03" event="http_request" latency_ms=26.52 method="POST" status=200 url="https://api.alpaca.markets/v2/watchlists"
+2025-10-13T04:00:50.926571859Z [INFO]  correlation_id="bd98a7a1-a3c1-4d82-b3f6-8e721aaefc03" event="request_complete" latency_ms=27.91 status=200
+INFO:     100.64.0.6:43888 - "POST /v2/watchlists HTTP/1.1" 200 OK
+2025-10-13T04:01:10.913826786Z [INFO]  correlation_id="fb1872ff-871e-4a2b-bb29-108c6476c773" event="incoming_request" method="GET" path="/v2/watchlists"
+2025-10-13T04:01:10.913833860Z [INFO]  correlation_id="fb1872ff-871e-4a2b-bb29-108c6476c773" event="gateway_key_header" length=9 present=true
+2025-10-13T04:01:10.913838543Z [INFO]  correlation_id="fb1872ff-871e-4a2b-bb29-108c6476c773" event="http_request" latency_ms=24.64 method="GET" status=200 url="https://api.alpaca.markets/v2/watchlists"
+2025-10-13T04:01:10.913842660Z [INFO]  correlation_id="fb1872ff-871e-4a2b-bb29-108c6476c773" event="request_complete" latency_ms=25.34 status=200
+INFO:     100.64.0.6:48388 - "GET /v2/watchlists HTTP/1.1" 200 OK
+2025-10-13T04:01:10.913850851Z [INFO]  correlation_id="4bea5d08-25fe-401b-98b0-1cc49511f872" event="incoming_request" method="DELETE" path="/v2/watchlists/3af120fe-aa44-4252-84b2-5f310345dc57"
+2025-10-13T04:01:10.913854780Z [INFO]  correlation_id="4bea5d08-25fe-401b-98b0-1cc49511f872" event="gateway_key_header" length=9 present=true
+2025-10-13T04:01:10.913859103Z [INFO]  correlation_id="4bea5d08-25fe-401b-98b0-1cc49511f872" event="http_request" latency_ms=8.19 method="DELETE" status=204 url="https://api.alpaca.markets/v2/watchlists/3af120fe-aa44-4252-84b2-5f310345dc57"
+2025-10-13T04:01:10.913863190Z [INFO]  correlation_id="4bea5d08-25fe-401b-98b0-1cc49511f872" event="request_complete" latency_ms=9.17 status=204
+INFO:     100.64.0.9:55916 - "DELETE /v2/watchlists/3af120fe-aa44-4252-84b2-5f310345dc57 HTTP/1.1" 204 No Content
+2025-10-13T04:01:50.914339223Z [INFO]  correlation_id="f8aca6a2-d183-4a53-b8d8-ee69d8fd8487" event="incoming_request" method="PUT" path="/v2/watchlists/3ac2a851-5c98-4f00-8c76-8ca605b97c87"
+2025-10-13T04:01:50.914345797Z [INFO]  correlation_id="f8aca6a2-d183-4a53-b8d8-ee69d8fd8487" event="gateway_key_header" length=9 present=true
+2025-10-13T04:01:50.914351004Z [INFO]  correlation_id="f8aca6a2-d183-4a53-b8d8-ee69d8fd8487" event="http_request" latency_ms=28.39 method="PUT" status=200 url="https://api.alpaca.markets/v2/watchlists/3ac2a851-5c98-4f00-8c76-8ca605b97c87"
+2025-10-13T04:01:50.914355339Z [INFO]  correlation_id="f8aca6a2-d183-4a53-b8d8-ee69d8fd8487" event="request_complete" latency_ms=29.73 status=200
+INFO:     100.64.0.6:48806 - "PUT /v2/watchlists/3ac2a851-5c98-4f00-8c76-8ca605b97c87 HTTP/1.1" 200 OK
+2025-10-13T11:12:08.467559780Z [INFO]  correlation_id="77ba7f70-2bf1-485d-bbfd-2caa8446f0ad" event="incoming_request" method="GET" path="/.well-known/openapi.json"
+2025-10-13T11:12:08.467570519Z [INFO]  correlation_id="77ba7f70-2bf1-485d-bbfd-2caa8446f0ad" event="gateway_key_header" length=0 present=false
+2025-10-13T11:12:08.467577153Z [INFO]  correlation_id="77ba7f70-2bf1-485d-bbfd-2caa8446f0ad" event="request_complete" latency_ms=23.72 status=200
+INFO:     100.64.0.2:48132 - "GET /.well-known/openapi.json HTTP/1.1" 200 OK
+2025-10-13T12:24:23.390065850Z [INFO]  correlation_id="2217c3b8-f163-4ab9-a071-08720c2c300c" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T12:24:23.390086234Z [INFO]  correlation_id="2217c3b8-f163-4ab9-a071-08720c2c300c" event="gateway_key_header" length=9 present=true
+2025-10-13T12:24:23.390094217Z [INFO]  correlation_id="2217c3b8-f163-4ab9-a071-08720c2c300c" event="request_complete" latency_ms=1.14 status=200
+INFO:     100.64.0.6:58932 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T12:24:32.532251101Z [INFO]  correlation_id="f03896be-b2b8-4954-a9aa-7643be6cef40" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T12:24:32.532258108Z [INFO]  correlation_id="f03896be-b2b8-4954-a9aa-7643be6cef40" event="gateway_key_header" length=9 present=true
+2025-10-13T12:24:32.532274828Z [INFO]  correlation_id="f03896be-b2b8-4954-a9aa-7643be6cef40" event="request_complete" latency_ms=0.83 status=200
+INFO:     100.64.0.4:53942 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T13:41:15.649328055Z [INFO]  correlation_id="1d0d5cce-3bc7-4458-a0c0-11c9f61da411" event="incoming_request" method="DELETE" path="/v2/positions/MASS"
+2025-10-13T13:41:15.649336924Z [INFO]  correlation_id="1d0d5cce-3bc7-4458-a0c0-11c9f61da411" event="gateway_key_header" length=9 present=true
+2025-10-13T13:41:15.649342734Z [INFO]  correlation_id="1d0d5cce-3bc7-4458-a0c0-11c9f61da411" event="http_request" latency_ms=21.02 method="DELETE" status=200 url="https://api.alpaca.markets/v2/positions/MASS"
+2025-10-13T13:41:15.649348135Z [INFO]  correlation_id="1d0d5cce-3bc7-4458-a0c0-11c9f61da411" event="request_complete" latency_ms=22.06 status=200
+INFO:     100.64.0.6:17434 - "DELETE /v2/positions/MASS?cancel_orders=true HTTP/1.1" 200 OK
+2025-10-13T13:42:45.659523988Z [INFO]  correlation_id="b250997b-be77-45dd-8c4f-5273ee2de3b3" event="incoming_request" method="DELETE" path="/v2/positions/WWR"
+2025-10-13T13:42:45.659537385Z [INFO]  correlation_id="b250997b-be77-45dd-8c4f-5273ee2de3b3" event="gateway_key_header" length=9 present=true
+2025-10-13T13:42:45.659548462Z [INFO]  correlation_id="b250997b-be77-45dd-8c4f-5273ee2de3b3" event="http_request" latency_ms=30.13 method="DELETE" status=200 url="https://api.alpaca.markets/v2/positions/WWR"
+2025-10-13T13:42:45.659557455Z [INFO]  correlation_id="b250997b-be77-45dd-8c4f-5273ee2de3b3" event="request_complete" latency_ms=31.44 status=200
+INFO:     100.64.0.9:60874 - "DELETE /v2/positions/WWR?cancel_orders=true HTTP/1.1" 200 OK
+2025-10-13T13:44:15.672853378Z [INFO]  correlation_id="07d01b05-223e-44f8-82f8-9d3e109c4390" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-13T13:44:15.672857823Z [INFO]  correlation_id="07d01b05-223e-44f8-82f8-9d3e109c4390" event="gateway_key_header" length=9 present=true
+2025-10-13T13:44:15.672861995Z [INFO]  correlation_id="07d01b05-223e-44f8-82f8-9d3e109c4390" event="http_request" latency_ms=26.93 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+2025-10-13T13:44:15.672865904Z [INFO]  correlation_id="07d01b05-223e-44f8-82f8-9d3e109c4390" event="request_complete" latency_ms=28.2 status=403
+INFO:     100.64.0.4:49864 - "POST /v2/orders HTTP/1.1" 403 Forbidden
+2025-10-13T13:44:15.672873826Z [INFO]  correlation_id="2cf66f8a-7580-42be-8822-10a1447b63f0" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-13T13:44:15.672877470Z [INFO]  correlation_id="2cf66f8a-7580-42be-8822-10a1447b63f0" event="gateway_key_header" length=9 present=true
+2025-10-13T13:44:15.672881415Z [INFO]  correlation_id="2cf66f8a-7580-42be-8822-10a1447b63f0" event="http_request" latency_ms=9.73 method="POST" status=403 url="https://api.alpaca.markets/v2/orders"
+INFO:     100.64.0.4:49864 - "POST /v2/orders HTTP/1.1" 403 Forbidden
+2025-10-13T13:44:15.672889750Z [INFO]  correlation_id="2cf66f8a-7580-42be-8822-10a1447b63f0" event="request_complete" latency_ms=11.22 status=403
+2025-10-13T13:45:05.675080996Z [INFO]  correlation_id="a6e7ac06-8c2b-41a4-b974-e942c39a37ef" event="incoming_request" method="POST" path="/v2/orders"
+2025-10-13T13:45:05.675087499Z [INFO]  correlation_id="a6e7ac06-8c2b-41a4-b974-e942c39a37ef" event="gateway_key_header" length=9 present=true
+2025-10-13T13:45:05.675092381Z [INFO]  correlation_id="a6e7ac06-8c2b-41a4-b974-e942c39a37ef" event="http_request" latency_ms=27.28 method="POST" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-13T13:45:05.675096534Z [INFO]  correlation_id="a6e7ac06-8c2b-41a4-b974-e942c39a37ef" event="request_complete" latency_ms=29.4 status=200
+INFO:     100.64.0.4:61142 - "POST /v2/orders HTTP/1.1" 200 OK
+2025-10-13T15:51:09.690047813Z [INFO]  correlation_id="4c446cc4-49fa-49eb-8313-75bd07637f95" event="incoming_request" method="GET" path="/"
+2025-10-13T15:51:09.690056882Z [INFO]  correlation_id="4c446cc4-49fa-49eb-8313-75bd07637f95" event="gateway_key_header" length=0 present=false
+2025-10-13T15:51:09.690063982Z [INFO]  correlation_id="4c446cc4-49fa-49eb-8313-75bd07637f95" event="request_complete" latency_ms=0.53 status=404
+INFO:     100.64.0.3:58136 - "GET / HTTP/1.1" 404 Not Found
+2025-10-13T15:51:09.690076383Z [INFO]  correlation_id="03d4b2b7-fd83-4c69-a6fe-db2a970ae2b6" event="incoming_request" method="GET" path="/favicon.ico"
+2025-10-13T15:51:09.690082527Z [INFO]  correlation_id="03d4b2b7-fd83-4c69-a6fe-db2a970ae2b6" event="gateway_key_header" length=0 present=false
+2025-10-13T15:51:09.690088604Z [INFO]  correlation_id="03d4b2b7-fd83-4c69-a6fe-db2a970ae2b6" event="request_complete" latency_ms=0.56 status=404
+INFO:     100.64.0.3:58136 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2025-10-13T15:51:11.980142042Z [INFO]  correlation_id="4fc1a84a-0207-44cc-8149-6a5b7690452d" event="incoming_request" method="GET" path="/docs"
+2025-10-13T15:51:11.980151089Z [INFO]  correlation_id="4fc1a84a-0207-44cc-8149-6a5b7690452d" event="gateway_key_header" length=0 present=false
+2025-10-13T15:51:11.980394747Z [INFO]  correlation_id="4fc1a84a-0207-44cc-8149-6a5b7690452d" event="request_complete" latency_ms=0.53 status=200
+INFO:     100.64.0.3:60558 - "GET /docs HTTP/1.1" 200 OK
+2025-10-13T15:51:12.515853032Z [INFO]  correlation_id="b9f6be37-464b-4865-87b1-40354bd6e92b" event="incoming_request" method="GET" path="/openapi.json"
+2025-10-13T15:51:12.515864418Z [INFO]  correlation_id="b9f6be37-464b-4865-87b1-40354bd6e92b" event="gateway_key_header" length=0 present=false
+2025-10-13T15:51:12.538409241Z [INFO]  correlation_id="b9f6be37-464b-4865-87b1-40354bd6e92b" event="request_complete" latency_ms=20.44 status=200
+INFO:     100.64.0.3:60558 - "GET /openapi.json HTTP/1.1" 200 OK
+2025-10-13T15:51:42.542372826Z [INFO]  correlation_id="3619f78c-6128-4d40-b32f-cd80ce8f8a97" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T15:51:42.542382958Z [INFO]  correlation_id="3619f78c-6128-4d40-b32f-cd80ce8f8a97" event="gateway_key_header" length=0 present=false
+2025-10-13T15:51:42.542389631Z [INFO]  correlation_id="3619f78c-6128-4d40-b32f-cd80ce8f8a97" event="request_complete" latency_ms=1.1 status=200
+INFO:     100.64.0.3:22646 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T15:51:49.278284352Z [INFO]  correlation_id="fbca1de3-1aad-4029-94c1-03d1b7b0a81d" event="incoming_request" method="GET" path="/openapi.json"
+2025-10-13T15:51:49.278292340Z [INFO]  correlation_id="fbca1de3-1aad-4029-94c1-03d1b7b0a81d" event="gateway_key_header" length=0 present=false
+2025-10-13T15:51:49.278298680Z [INFO]  correlation_id="fbca1de3-1aad-4029-94c1-03d1b7b0a81d" event="request_complete" latency_ms=1.33 status=200
+INFO:     100.64.0.3:23066 - "GET /openapi.json HTTP/1.1" 200 OK
+2025-10-13T16:39:20.539001567Z [INFO]  correlation_id="87d03c19-2130-4578-be50-513684e1c9cf" event="incoming_request" method="GET" path="/v2/positions"
+2025-10-13T16:39:20.539013882Z [INFO]  correlation_id="87d03c19-2130-4578-be50-513684e1c9cf" event="gateway_key_header" length=9 present=true
+2025-10-13T16:39:20.539020927Z [INFO]  correlation_id="87d03c19-2130-4578-be50-513684e1c9cf" event="http_request" latency_ms=23.08 method="GET" status=200 url="https://api.alpaca.markets/v2/positions"
+2025-10-13T16:39:20.539027270Z [INFO]  correlation_id="87d03c19-2130-4578-be50-513684e1c9cf" event="request_complete" latency_ms=23.97 status=200
+INFO:     100.64.0.8:35040 - "GET /v2/positions HTTP/1.1" 200 OK
+2025-10-13T17:33:32.696143578Z [INFO]  correlation_id="730c6a85-37c4-477e-b578-074bb5d5850c" event="incoming_request" method="GET" path="/v2/account"
+2025-10-13T17:33:32.696153425Z [INFO]  correlation_id="730c6a85-37c4-477e-b578-074bb5d5850c" event="gateway_key_header" length=0 present=false
+2025-10-13T17:33:32.696159954Z [INFO]  correlation_id="730c6a85-37c4-477e-b578-074bb5d5850c" event="request_complete" latency_ms=0.52 status=401
+INFO:     100.64.0.2:31494 - "GET /v2/account HTTP/1.1" 401 Unauthorized
+2025-10-13T17:33:32.696175269Z [INFO]  correlation_id="42e510cf-498b-46b5-b902-47f213fd2623" event="incoming_request" method="GET" path="/v2/account"
+2025-10-13T17:33:32.696181614Z [INFO]  correlation_id="42e510cf-498b-46b5-b902-47f213fd2623" event="gateway_key_header" length=9 present=true
+2025-10-13T17:33:32.696187812Z [INFO]  correlation_id="42e510cf-498b-46b5-b902-47f213fd2623" event="http_request" latency_ms=26.92 method="GET" status=200 url="https://api.alpaca.markets/v2/account"
+2025-10-13T17:33:32.696194667Z [INFO]  correlation_id="42e510cf-498b-46b5-b902-47f213fd2623" event="request_complete" latency_ms=28.02 status=200
+INFO:     100.64.0.4:60700 - "GET /v2/account HTTP/1.1" 200 OK
+2025-10-13T17:33:32.696207505Z [INFO]  correlation_id="e36e6de4-2620-450d-8ac8-108572179a69" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T17:33:32.696213853Z [INFO]  correlation_id="e36e6de4-2620-450d-8ac8-108572179a69" event="gateway_key_header" length=9 present=true
+INFO:     100.64.0.6:15924 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T17:33:32.696226130Z [INFO]  correlation_id="e36e6de4-2620-450d-8ac8-108572179a69" event="request_complete" latency_ms=0.81 status=200
+2025-10-13T17:55:53.390416651Z [INFO]  correlation_id="335230c8-cb68-457b-835e-f23af638e7f5" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T17:55:53.390424292Z [INFO]  correlation_id="335230c8-cb68-457b-835e-f23af638e7f5" event="gateway_key_header" length=0 present=false
+2025-10-13T17:55:53.390433304Z [INFO]  correlation_id="335230c8-cb68-457b-835e-f23af638e7f5" event="request_complete" latency_ms=0.88 status=200
+INFO:     100.64.0.8:30580 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T17:55:53.390442586Z [INFO]  correlation_id="b42d0d69-12af-4e64-8017-05eff487acdb" event="incoming_request" method="GET" path="/v2/account"
+2025-10-13T17:55:53.390446656Z [INFO]  correlation_id="b42d0d69-12af-4e64-8017-05eff487acdb" event="gateway_key_header" length=0 present=false
+2025-10-13T17:55:53.390450487Z [INFO]  correlation_id="b42d0d69-12af-4e64-8017-05eff487acdb" event="request_complete" latency_ms=0.64 status=401
+INFO:     100.64.0.8:30580 - "GET /v2/account HTTP/1.1" 401 Unauthorized
+2025-10-13T17:55:56.438149156Z [INFO]  correlation_id="5f1b5954-5422-4bef-bdf3-6108bc81a6f0" event="incoming_request" method="GET" path="/v2/account"
+2025-10-13T17:55:56.438156536Z [INFO]  correlation_id="5f1b5954-5422-4bef-bdf3-6108bc81a6f0" event="gateway_key_header" length=9 present=true
+2025-10-13T17:55:56.456503714Z [INFO]  correlation_id="5f1b5954-5422-4bef-bdf3-6108bc81a6f0" event="http_request" latency_ms=23.89 method="GET" status=200 url="https://api.alpaca.markets/v2/account"
+2025-10-13T17:55:56.456513141Z [INFO]  correlation_id="5f1b5954-5422-4bef-bdf3-6108bc81a6f0" event="request_complete" latency_ms=25.09 status=200
+INFO:     100.64.0.3:50308 - "GET /v2/account HTTP/1.1" 200 OK
+2025-10-13T17:56:00.162895836Z [INFO]  correlation_id="fda8f062-fdbf-4ea1-9ad5-98c31a91cd69" event="incoming_request" method="GET" path="/v2/positions"
+2025-10-13T17:56:00.162905332Z [INFO]  correlation_id="fda8f062-fdbf-4ea1-9ad5-98c31a91cd69" event="gateway_key_header" length=9 present=true
+2025-10-13T17:56:00.163055103Z [INFO]  correlation_id="fda8f062-fdbf-4ea1-9ad5-98c31a91cd69" event="http_request" latency_ms=7.87 method="GET" status=200 url="https://api.alpaca.markets/v2/positions"
+2025-10-13T17:56:00.163061173Z [INFO]  correlation_id="fda8f062-fdbf-4ea1-9ad5-98c31a91cd69" event="request_complete" latency_ms=8.78 status=200
+INFO:     100.64.0.8:53208 - "GET /v2/positions HTTP/1.1" 200 OK
+2025-10-13T17:56:03.518947925Z [INFO]  correlation_id="f7817eb7-3f3b-49be-b712-9b881d3a7ebc" event="incoming_request" method="GET" path="/readyz"
+2025-10-13T17:56:03.518954330Z [INFO]  correlation_id="f7817eb7-3f3b-49be-b712-9b881d3a7ebc" event="gateway_key_header" length=9 present=true
+2025-10-13T17:56:03.518958580Z [INFO]  correlation_id="f7817eb7-3f3b-49be-b712-9b881d3a7ebc" event="request_complete" latency_ms=1.05 status=200
+INFO:     100.64.0.7:34540 - "GET /readyz HTTP/1.1" 200 OK
+2025-10-13T17:56:06.806901129Z [INFO]  correlation_id="1a92a205-5571-4632-bfcf-5be912c5e23e" event="incoming_request" method="GET" path="/readyz"
+2025-10-13T17:56:06.806907854Z [INFO]  correlation_id="1a92a205-5571-4632-bfcf-5be912c5e23e" event="gateway_key_header" length=0 present=false
+2025-10-13T17:56:06.806915297Z [INFO]  correlation_id="1a92a205-5571-4632-bfcf-5be912c5e23e" event="request_complete" latency_ms=0.82 status=401
+INFO:     100.64.0.8:35342 - "GET /readyz HTTP/1.1" 401 Unauthorized
+2025-10-13T17:58:56.875100976Z [INFO]  correlation_id="c5e5612e-94a1-4368-b3e3-314e47695c68" event="incoming_request" method="GET" path="/healthz"
+2025-10-13T17:58:56.875112827Z [INFO]  correlation_id="c5e5612e-94a1-4368-b3e3-314e47695c68" event="gateway_key_header" length=9 present=true
+2025-10-13T17:58:56.875119029Z [INFO]  correlation_id="c5e5612e-94a1-4368-b3e3-314e47695c68" event="request_complete" latency_ms=1.12 status=200
+INFO:     100.64.0.4:18900 - "GET /healthz HTTP/1.1" 200 OK
+2025-10-13T17:59:01.097940998Z [INFO]  correlation_id="58877c6e-b2b2-4702-bcca-bd8f92dc2799" event="incoming_request" method="GET" path="/v2/orders"
+2025-10-13T17:59:01.097950520Z [INFO]  correlation_id="58877c6e-b2b2-4702-bcca-bd8f92dc2799" event="gateway_key_header" length=9 present=true
+2025-10-13T17:59:01.117849371Z [INFO]  correlation_id="58877c6e-b2b2-4702-bcca-bd8f92dc2799" event="http_request" latency_ms=19.03 method="GET" status=200 url="https://api.alpaca.markets/v2/orders"
+2025-10-13T17:59:01.117859173Z [INFO]  correlation_id="58877c6e-b2b2-4702-bcca-bd8f92dc2799" event="request_complete" latency_ms=19.78 status=200
+INFO:     100.64.0.9:60666 - "GET /v2/orders HTTP/1.1" 200 OK

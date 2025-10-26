@@ -1,3 +1,4 @@
+import asyncio
 from typing import Awaitable, Callable, Dict, Optional, Union
 
 from alpaca.common.enums import BaseURL

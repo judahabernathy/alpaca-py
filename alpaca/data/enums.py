@@ -30,7 +30,7 @@ class Exchange(str, Enum):
     """
 
     Z = "Z"
-    I = "I"  # noqa: E741
+    I = "I"
     M = "M"
     U = "U"
     L = "L"

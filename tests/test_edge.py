@@ -6,8 +6,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse, Response
+from pydantic import ValidationError
 from starlette.requests import Request
 from urllib.parse import urlencode
 
@@ -1120,4 +1121,325 @@ async def test_account_activities_translates_unauthorized(monkeypatch):
     assert isinstance(response, JSONResponse)
     assert response.status_code == 403
     assert json.loads(response.body.decode())["detail"].startswith("Activities not enabled")
+
+
+@pytest.mark.asyncio
+async def test_order_reject_handler_returns_problem_details():
+    request = build_request("/v2/orders")
+    exc = app.OrderReject(reason_code="limit_issue", detail="too wide", context={"foo": "bar"})
+
+    response = await app.order_reject_handler(request, exc)
+
+    assert response.status_code == 409
+    body = json.loads(response.body)
+    assert body["type"].endswith("/limit_issue")
+    assert body["detail"] == "too wide"
+    assert body["context"] == {"foo": "bar"}
+
+
+@pytest.mark.asyncio
+async def test_correlation_middleware_sets_header_and_resets(monkeypatch):
+    request = build_request("/middleware")
+    events = []
+
+    def fake_set_correlation(correlation_id: str) -> str:
+        events.append(("set", correlation_id))
+        return "token"
+
+    def fake_reset_token(token: str) -> None:
+        events.append(("reset", token))
+
+    monkeypatch.setattr(app, "set_correlation_id", fake_set_correlation)
+    monkeypatch.setattr(app, "reset_correlation_id", fake_reset_token)
+    monkeypatch.setattr(app, "log_event", lambda *args, **kwargs: events.append(("event", kwargs.get("path"))))
+    monkeypatch.setattr(app, "log_duration", lambda *args, **kwargs: events.append(("duration", kwargs.get("status"))))
+
+    async def call_next(req):
+        assert req is request
+        return Response(content="ok", media_type="text/plain")
+
+    response = await app.correlation_middleware(request, call_next)
+
+    assert response.headers["X-Correlation-ID"]
+    assert events[0][0] == "set"
+    assert events[-1] == ("reset", "token")
+
+
+@pytest.mark.asyncio
+async def test_get_openai_client_requires_key(monkeypatch):
+    original_key = app.OPENAI_API_KEY
+    monkeypatch.setattr(app, "OPENAI_API_KEY", None)
+    with pytest.raises(HTTPException) as excinfo:
+        app._get_openai_client()
+    assert excinfo.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    monkeypatch.setattr(app, "OPENAI_API_KEY", original_key)
+
+
+def test_order_reject_from_response_parses_json():
+    payload = {"detail": "Limit drift", "reason_code": "limit guard", "extra": "info"}
+    err = app._order_reject_from_response(409, json.dumps(payload))
+    assert err.detail == "Limit drift"
+    assert err.reason_code == "LIMIT_GUARD"
+    assert err.context == {"extra": "info"}
+
+
+@pytest.mark.asyncio
+async def test_fetch_account_snapshot_success(monkeypatch):
+    async def fake_request(client, method, path, **kwargs):
+        assert path == "/v2/account"
+        body = json.dumps({"status": "ACTIVE", "cash_balance": "1000", "maintenance_margin": "12"})
+        return 200, {"Content-Type": "application/json"}, body
+
+    monkeypatch.setattr(app, "_request_with_retry", fake_request)
+    monkeypatch.setattr(app, "_get_trading_http_client", lambda: object())
+
+    snapshot = await app._fetch_account_snapshot()
+    assert snapshot["cash"] == "1000"
+    assert snapshot["maintenance_margin"] == "12"
+
+
+@pytest.mark.asyncio
+async def test_fetch_positions_snapshot_compacts(monkeypatch):
+    positions = [
+        {"symbol": "AAPL", "qty": "10", "avg_entry_price": "100", "market_value": "1000", "side": "long"},
+        "ignored",
+    ]
+
+    async def fake_request(client, method, path, **kwargs):
+        assert path == "/v2/positions"
+        return 200, {"Content-Type": "application/json"}, json.dumps(positions)
+
+    monkeypatch.setattr(app, "_request_with_retry", fake_request)
+    monkeypatch.setattr(app, "_get_trading_http_client", lambda: object())
+
+    result = await app._fetch_positions_snapshot(limit=5)
+    assert result["items"] == [{"symbol": "AAPL", "qty": "10", "avg_entry_price": "100", "market_value": "1000", "side": "long"}]
+
+
+@pytest.mark.asyncio
+async def test_fetch_open_orders_snapshot_includes_legs(monkeypatch):
+    orders = [
+        {
+            "id": "1",
+            "symbol": "AAPL",
+            "side": "buy",
+            "qty": "1",
+            "status": "open",
+            "legs": [
+                {"symbol": "AAPL", "side": "buy", "qty": "1", "type": "limit", "limit_price": "100", "status": "open"},
+            ],
+        }
+    ]
+
+    async def fake_request(client, method, path, params=None, **kwargs):
+        assert path == "/v2/orders"
+        assert params == {"status": "open", "nested": "true"}
+        return 200, {"Content-Type": "application/json"}, json.dumps(orders)
+
+    monkeypatch.setattr(app, "_request_with_retry", fake_request)
+    monkeypatch.setattr(app, "_get_trading_http_client", lambda: object())
+
+    result = await app._fetch_open_orders_snapshot(limit=5)
+    assert result["items"][0]["legs"][0]["symbol"] == "AAPL"
+
+
+@pytest.mark.asyncio
+async def test_collect_order_plan_context_gathers(monkeypatch):
+    calls = []
+
+    async def fake_account():
+        calls.append("account")
+        return {"equity": "1000"}
+
+    async def fake_positions():
+        calls.append("positions")
+        return {"items": [{"symbol": "AAPL"}]}
+
+    async def fake_open_orders():
+        calls.append("orders")
+        return {"items": [{"id": "1"}]}
+
+    monkeypatch.setattr(app, "_fetch_account_snapshot", fake_account)
+    monkeypatch.setattr(app, "_fetch_positions_snapshot", fake_positions)
+    monkeypatch.setattr(app, "_fetch_open_orders_snapshot", fake_open_orders)
+
+    intent = app.OrderIntent(symbol="AAPL", side="buy", order_type="limit", time_in_force="day", qty=1, limit_price=100)
+    payload = app.OrderPlanRequest(
+        orders=[intent],
+        include_account=True,
+        include_positions=True,
+        include_open_orders=True,
+        risk_notes="mind leverage",
+    )
+
+    context = await app._collect_order_plan_context(payload)
+    assert set(calls) == {"account", "positions", "orders"}
+    assert context["orders"][0]["symbol"] == "AAPL"
+    assert context["risk_notes"] == "mind leverage"
+    assert context["account"]["equity"] == "1000"
+
+
+@pytest.mark.asyncio
+async def test_call_order_plan_model_returns_response(monkeypatch):
+    class FakeResponses:
+        async def parse(self, **kwargs):
+            return app.OrderPlanResponse(
+                execution_ready=True,
+                plan_summary="Looks good",
+                orders=[],
+                account_notes=["note"],
+                follow_up_tasks=[],
+            )
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.responses = FakeResponses()
+
+    monkeypatch.setattr(app, "_get_openai_client", lambda: FakeClient())
+
+    result = await app._call_order_plan_model({"orders": []})
+    assert result.execution_ready is True
+    assert result.plan_summary == "Looks good"
+
+
+def test_parse_timeframe_validates():
+    frame = app.parse_timeframe("5Min")
+    assert frame.amount == 5
+    assert frame.unit == app.TimeFrameUnit.Minute
+
+    with pytest.raises(HTTPException):
+        app.parse_timeframe("bad")
+    with pytest.raises(HTTPException):
+        app.parse_timeframe("1Yr")
+
+
+def test_healthz_reports_dependencies(monkeypatch):
+    trading = edge_http.EdgeHttpClient("https://example.com")
+    data = edge_http.EdgeHttpClient("https://data.example.com")
+    monkeypatch.setattr(app.app.state, "trading_http_client", trading, raising=False)
+    monkeypatch.setattr(app.app.state, "data_http_client", data, raising=False)
+    monkeypatch.setattr(app.app.state, "http_client", trading, raising=False)
+    monkeypatch.setattr(app, "_alpaca_credentials_present", lambda: True)
+
+    result = app.healthz()
+    assert result["ok"] is True
+    assert result["dependencies"]["alpaca_credentials"] is True
+
+
+def test_resolve_client_order_id_enforces(monkeypatch):
+    monkeypatch.setenv("ALPHA_REQUIRE_CLIENT_ID", "1")
+    with pytest.raises(HTTPException):
+        app._resolve_client_order_id(None)
+
+    monkeypatch.setenv("ALPHA_REQUIRE_CLIENT_ID", "0")
+    assert app._resolve_client_order_id("cid") == "cid"
+
+
+def test_enforce_ext_policy_applies_extended_hours(monkeypatch):
+    monkeypatch.setenv("ALPHA_ENFORCE_EXT", "1")
+    payload = {
+        "type": "limit",
+        "time_in_force": "day",
+        "extended_hours": True,
+        "symbol": "AAPL",
+        "side": "buy",
+    }
+    with pytest.raises(app.OrderReject) as excinfo:
+        app._enforce_ext_policy(payload)
+    assert excinfo.value.reason_code == "EXT_MISSING_LIMIT"
+
+
+def test_enforce_ext_policy_calls_limit_guard(monkeypatch):
+    monkeypatch.setenv("ALPHA_ENFORCE_EXT", "1")
+    seen = {}
+
+    def fake_guard(symbol, limit_price, side):
+        seen["args"] = (symbol, limit_price, side)
+
+    monkeypatch.setattr(app, "evaluate_limit_guard", fake_guard)
+    payload = {
+        "type": "limit",
+        "time_in_force": "day",
+        "extended_hours": False,
+        "symbol": "MSFT",
+        "side": "sell",
+        "limit_price": 120,
+    }
+
+    assert app._enforce_ext_policy(payload) is payload
+    assert seen["args"] == ("MSFT", 120, "sell")
+
+
+def test_enforce_ext_policy_returns_payload_when_disabled(monkeypatch):
+    monkeypatch.delenv("ALPHA_ENFORCE_EXT", raising=False)
+    payload = {"type": "market"}
+    assert app._enforce_ext_policy(payload) is payload
+
+
+def test_evaluate_limit_guard_rejects_stale_quote(monkeypatch):
+    class Quote:
+        def __init__(self) -> None:
+            self.timestamp = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat()
+            self.ask_price = 100
+            self.bid_price = 99
+
+    class FakeClient:
+        def get_stock_latest_quote(self, *args, **kwargs):
+            return {"AAPL": Quote()}
+
+    monkeypatch.setenv("ALPHA_QUOTE_TTL_SECONDS", "0.1")
+    monkeypatch.setattr(app, "md_client", lambda: FakeClient())
+
+    with pytest.raises(app.OrderReject) as excinfo:
+        app.evaluate_limit_guard("AAPL", 101, "buy")
+    assert excinfo.value.reason_code == "QUOTE_TOO_OLD"
+
+
+def test_evaluate_limit_guard_rejects_excessive_drift(monkeypatch):
+    class Quote:
+        def __init__(self) -> None:
+            self.timestamp = datetime.now(timezone.utc)
+            self.ask_price = 100
+            self.bid_price = 99
+
+    class FakeClient:
+        def get_stock_latest_quote(self, *args, **kwargs):
+            return {"AAPL": Quote()}
+
+    monkeypatch.setenv("ALPHA_QUOTE_TTL_SECONDS", "60")
+    monkeypatch.setenv("ALPHA_MAX_DRIFT_BPS", "10")
+    monkeypatch.setattr(app, "md_client", lambda: FakeClient())
+
+    with pytest.raises(app.OrderReject) as excinfo:
+        app.evaluate_limit_guard("AAPL", 105, "buy")
+    assert excinfo.value.reason_code == "BIDASK_DRIFT"
+
+
+@pytest.mark.asyncio
+async def test_call_order_plan_model_handles_validation_retry(monkeypatch):
+    attempts = {"count": 0}
+
+    class FakeResponses:
+        async def parse(self, **kwargs):
+            attempts["count"] += 1
+            if attempts["count"] == 1:
+                app.OrderPlanResponse.model_validate({})
+            class Wrapper:
+                parsed = app.OrderPlanResponse(
+                    execution_ready=False,
+                    plan_summary="retry",
+                    orders=[],
+                    account_notes=[],
+                    follow_up_tasks=[],
+                )
+            return Wrapper()
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.responses = FakeResponses()
+
+    monkeypatch.setattr(app, "_get_openai_client", lambda: FakeClient())
+
+    result = await app._call_order_plan_model({"orders": []})
+    assert result.plan_summary == "retry"
 

@@ -1,6 +1,6 @@
-from datetime import datetime
-from typing import Optional, Union
+from typing import Union, Optional
 from uuid import UUID
+from datetime import datetime
 
 
 def validate_uuid_id_param(
@@ -24,16 +24,16 @@ def validate_uuid_id_param(
         var_name = "account_id"
 
     # should raise ValueError
-    if isinstance(id, str):
+    if type(id) == str:
         id = UUID(id)
-    elif not isinstance(id, UUID):
+    elif type(id) != UUID:
         raise ValueError(f"{var_name} must be a UUID or a UUID str")
 
     return id
 
 
 def validate_symbol_or_asset_id(
-    symbol_or_asset_id: Union[UUID, str],
+    symbol_or_asset_id: Union[UUID, str]
 ) -> Union[UUID, str]:
     """
     A helper function to eliminate duplicate checks of symbols or asset ids.
@@ -55,7 +55,7 @@ def validate_symbol_or_asset_id(
 
 
 def validate_symbol_or_contract_id(
-    symbol_or_contract_id: Union[UUID, str],
+    symbol_or_contract_id: Union[UUID, str]
 ) -> Union[UUID, str]:
     """
     A helper function to eliminate duplicate checks of symbols or contract id.
