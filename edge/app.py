@@ -9,11 +9,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Union, cast, Literal
+from typing import Any, Dict, List, Optional, Union, cast, Literal, Tuple
 from uuid import uuid4
 from urllib.parse import urlparse, urlunparse
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import FastAPI, Header, HTTPException, Query, Request, status, Body
 from fastapi.params import Param
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -628,6 +628,58 @@ class WatchlistIn(BaseModel):
     symbols: List[str]
 
 
+class AccountConfigurationUpdate(BaseModel):
+    """Matches Alpaca account configuration fields (Oct 2025)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    dtbp_check: Optional[str] = Field(
+        default=None,
+        description="Day-trade buying power check enforcement (none, entry, exit, both).",
+    )
+    no_shorting: Optional[bool] = Field(
+        default=None, description="Disable all short sales when true."
+    )
+    suspend_trade: Optional[bool] = Field(
+        default=None, description="If true, new orders are blocked at the account level."
+    )
+    trade_confirm_email: Optional[str] = Field(
+        default=None,
+        description="Email preference for order confirmations (all, none, trade_activity).",
+    )
+    fractional_trading: Optional[bool] = Field(
+        default=None, description="Enable fractional share trading."
+    )
+    max_margin_multiplier: Optional[str] = Field(
+        default=None, description="Maximum intraday margin multiplier (e.g. '2', '4')."
+    )
+    pdt_check: Optional[str] = Field(
+        default=None,
+        description="Pattern day trading check behaviour (enforced, bypassed, entry_only).",
+    )
+
+
+class WatchlistEntryPatch(BaseModel):
+    """Payload for adding an asset to an existing watchlist."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    symbol: Optional[str] = Field(
+        default=None,
+        description="Ticker symbol to add (symbol or asset_id required by Oct 2025 docs).",
+        min_length=1,
+    )
+    asset_id: Optional[str] = Field(
+        default=None,
+        description="UUID of the asset when symbol lookup is ambiguous.",
+        min_length=1,
+    )
+
+    def model_post_init(self, __context: Any) -> None:
+        if not (self.symbol or self.asset_id):
+            raise ValueError("Either symbol or asset_id is required")
+
+
 def _order_payload_from_model(order: Union[BaseModel, Dict[str, Any]]) -> Dict[str, Any]:
     if isinstance(order, BaseModel):
         return order.model_dump(exclude_none=True)
@@ -965,6 +1017,29 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
         return OrderPlanResponse.model_validate(parsed)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=502, detail=f"OpenAI payload validation failed: {exc}") from exc
+def _serialise_query_params(values: Any) -> Optional[Union[Dict[str, str], List[Tuple[str, str]]]]:
+    """Preserve duplicate query keys when forwarding upstream."""
+    if values is None:
+        return None
+    items: List[Tuple[str, str]] = []
+    multi_items = getattr(values, 'multi_items', None)
+    if callable(multi_items):
+        items = [(str(k), str(v)) for k, v in multi_items()]
+    elif isinstance(values, dict):
+        items = [(str(k), str(v)) for k, v in values.items()]
+    else:
+        try:
+            items = [(str(k), str(v)) for k, v in values]
+        except Exception:
+            items = []
+    if not items:
+        return None
+    has_duplicates = len({k for k, _ in items}) != len(items)
+    if has_duplicates:
+        return items
+    return {k: v for k, v in items}
+
+
 def parse_timeframe(tf_str: str) -> TimeFrame:
     m = re.match(r'^(\d+)([A-Za-z]+)$', tf_str)
     if not m:
@@ -1104,6 +1179,139 @@ async def account_activities(
     return _decode_json(headers, body)
 
 
+@app.get("/v2/account/configurations")
+async def account_configurations_get(request: Request):
+    _require_gateway_key_from_request(request)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        "/v2/account/configurations",
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+    return _decode_json(headers, body)
+
+@app.patch("/v2/account/configurations")
+async def account_configurations_patch(payload: AccountConfigurationUpdate, request: Request):
+    _require_gateway_key_from_request(request)
+    primary = payload.model_dump(exclude_none=True)
+    extras = getattr(payload, 'model_extra', None) or {}
+    body_payload = {**extras, **primary}
+    if not body_payload:
+        raise HTTPException(status_code=400, detail="At least one configuration field must be provided.")
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "PATCH",
+        "/v2/account/configurations",
+        json=body_payload,
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status, detail=body)
+    return _decode_json(headers, body)
+
+@app.get("/v2/account/portfolio/history")
+async def portfolio_history(request: Request):
+    _require_gateway_key_from_request(request)
+    params = _serialise_query_params(request.query_params)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        "/v2/account/portfolio/history",
+        params=params,
+    )
+    return _passthrough_json(status, headers, body)
+
+@app.get("/v2/assets")
+async def assets_list(request: Request):
+    _require_gateway_key_from_request(request)
+    params = _serialise_query_params(request.query_params)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        "/v2/assets",
+        params=params,
+    )
+    return _passthrough_json(status, headers, body)
+
+@app.get("/v2/assets/{asset_id_or_symbol}")
+async def assets_get(asset_id_or_symbol: str, request: Request):
+    _require_gateway_key_from_request(request)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        f"/v2/assets/{asset_id_or_symbol}",
+    )
+    return _passthrough_json(status, headers, body)
+
+@app.get("/v2/calendar")
+async def trading_calendar(request: Request):
+    _require_gateway_key_from_request(request)
+    params = _serialise_query_params(request.query_params)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        "/v2/calendar",
+        params=params,
+    )
+    return _passthrough_json(status, headers, body)
+
+@app.get("/v2/clock")
+async def market_clock(request: Request):
+    _require_gateway_key_from_request(request)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        "/v2/clock",
+    )
+    return _passthrough_json(status, headers, body)
+
+@app.get("/v2/corporate_actions/announcements")
+async def corporate_actions_announcements(request: Request):
+    _require_gateway_key_from_request(request)
+    params = _serialise_query_params(request.query_params)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        "/v2/corporate_actions/announcements",
+        params=params,
+    )
+    return _passthrough_json(status, headers, body)
+
+@app.get("/v2/corporate_actions/announcements/{announcement_id}")
+async def corporate_actions_announcement_get(announcement_id: str, request: Request):
+    _require_gateway_key_from_request(request)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        f"/v2/corporate_actions/announcements/{announcement_id}",
+    )
+    return _passthrough_json(status, headers, body)
+
+@app.get("/v2/options/contracts")
+async def options_contracts(request: Request):
+    _require_gateway_key_from_request(request)
+    params = _serialise_query_params(request.query_params)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        "/v2/options/contracts",
+        params=params,
+    )
+    return _passthrough_json(status, headers, body)
+
+@app.get("/v2/options/contracts/{contract_id}")
+async def options_contract_get(contract_id: str, request: Request):
+    _require_gateway_key_from_request(request)
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        f"/v2/options/contracts/{contract_id}",
+    )
+    return _passthrough_json(status, headers, body)
+
+
+
+
 
 
 @app.get("/v2/orders")
@@ -1119,6 +1327,21 @@ async def orders_list(request: Request):
     return _passthrough_json(status, headers, body)
 
 
+
+@app.get("/v2/orders:by_client_order_id")
+async def orders_by_client_order_id(
+    request: Request,
+    client_order_id: str = Query(..., description="Client order identifier as documented in Alpaca Trading API (Oct 2025)."),
+) -> Response:
+    _require_gateway_key_from_request(request)
+    params = {"client_order_id": client_order_id}
+    status, headers, body = await _request_with_retry(
+        _get_trading_http_client(),
+        "GET",
+        "/v2/orders:by_client_order_id",
+        params=params,
+    )
+    return _passthrough_json(status, headers, body)
 
 @app.get("/v2/orders/{order_id}")
 async def orders_get_by_id(order_id: str, request: Request):
@@ -1215,6 +1438,19 @@ async def positions_close(
 
 
 
+@app.post("/v2/positions/{symbol_or_contract_id}/exercise")
+async def positions_exercise(symbol_or_contract_id: str, request: Request, payload: Optional[Dict[str, Any]] = Body(None)):
+    _require_gateway_key_from_request(request)
+    body = payload or {}
+    status, headers, response_body = await _request_with_retry(
+        _get_trading_http_client(),
+        "POST",
+        f"/v2/positions/{symbol_or_contract_id}/exercise",
+        json=body or None,
+    )
+    return _passthrough_json(status, headers, response_body)
+
+
 async def _proxy_alpaca_request(
     method: str,
     path: str,
@@ -1303,6 +1539,26 @@ async def watchlists_update_v2(
         payload=watchlist.model_dump(),
     )
 
+
+
+@app.post("/v2/watchlists/{watchlist_id}")
+async def watchlists_add_asset_v2(watchlist_id: str, entry: WatchlistEntryPatch, request: Request):
+    payload = entry.model_dump(exclude_none=True)
+    return await _proxy_alpaca_request(
+        "POST",
+        f"/v2/watchlists/{watchlist_id}",
+        request,
+        payload=payload,
+    )
+
+
+@app.delete("/v2/watchlists/{watchlist_id}/{symbol}")
+async def watchlists_remove_asset_v2(watchlist_id: str, symbol: str, request: Request):
+    return await _proxy_alpaca_request(
+        "DELETE",
+        f"/v2/watchlists/{watchlist_id}/{symbol}",
+        request,
+    )
 
 
 @app.delete("/v2/watchlists/{watchlist_id}")

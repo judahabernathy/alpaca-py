@@ -494,120 +494,108 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       x-openai-isConsequential: true
   /v2/watchlists/{watchlist_id}:
-    get:
-      summary: Watchlists Get V2
-      operationId: watchlists_get_v2_v2_watchlists__watchlist_id__get
+    delete:
+      operationId: watchlists_delete_v2_v2_watchlists__watchlist_id__delete
       parameters:
-      - name: watchlist_id
-        in: path
+      - in: path
+        name: watchlist_id
         required: true
         schema:
-          type: string
           title: Watchlist Id
+          type: string
       responses:
         '200':
-          description: Successful Response
           content:
             application/json:
               schema: {}
+          description: Successful Response
         '422':
-          description: Validation Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-    put:
-      summary: Watchlists Update V2
-      operationId: watchlists_update_v2_v2_watchlists__watchlist_id__put
+          description: Validation Error
+      summary: Watchlists Delete V2
+      x-openai-isConsequential: true
+    get:
+      operationId: watchlists_get_v2_v2_watchlists__watchlist_id__get
       parameters:
-      - name: watchlist_id
-        in: path
+      - in: path
+        name: watchlist_id
         required: true
         schema:
-          type: string
           title: Watchlist Id
-      requestBody:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Watchlists Get V2
+    post:
+      operationId: watchlists_add_asset_v2_v2_watchlists__watchlist_id__post
+      parameters:
+      - in: path
+        name: watchlist_id
         required: true
+        schema:
+          title: Watchlist Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchlistEntryPatch'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Watchlists Add Asset V2
+    put:
+      operationId: watchlists_update_v2_v2_watchlists__watchlist_id__put
+      parameters:
+      - in: path
+        name: watchlist_id
+        required: true
+        schema:
+          title: Watchlist Id
+          type: string
+      requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/WatchlistIn'
+        required: true
       responses:
         '200':
-          description: Successful Response
           content:
             application/json:
               schema: {}
+          description: Successful Response
         '422':
-          description: Validation Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-      x-openai-isConsequential: true
-    delete:
-      summary: Watchlists Delete V2
-      operationId: watchlists_delete_v2_v2_watchlists__watchlist_id__delete
-      parameters:
-      - name: watchlist_id
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Watchlist Id
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '422':
           description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+      summary: Watchlists Update V2
       x-openai-isConsequential: true
-    post:
-      summary: Watchlist Add Asset
-      operationId: watchlist_add_asset_v2_watchlists_watchlist_id_post
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Add an asset to the specified watchlist.
-      parameters:
-      - name: watchlist_id
-        in: path
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-              - symbol
-              properties:
-                symbol:
-                  type: string
-                  description: Symbol to add to the watchlist.
-              additionalProperties: false
-        required: true
   /v2/quotes:
     get:
       summary: Get Quotes V2
@@ -739,55 +727,35 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
   /v2/account/configurations:
     get:
-      summary: Account Configurations Get
       operationId: account_configurations_get_v2_account_configurations_get
       responses:
         '200':
-          description: Successful Response
           content:
             application/json:
               schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Retrieve the current account configurations.
+          description: Successful Response
+      summary: Account Configurations Get
     patch:
-      summary: Account Configurations Update
-      operationId: account_configurations_update_v2_account_configurations_patch
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Update account configurations.
+      operationId: account_configurations_patch_v2_account_configurations_patch
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              description: Fields to update on the account configuration.
-              additionalProperties: true
+              $ref: '#/components/schemas/AccountConfigurationUpdate'
         required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: {}
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Account Configurations Patch
   /v2/account/portfolio/history:
     get:
       summary: Portfolio History
@@ -1801,6 +1769,76 @@ components:
               additionalProperties: true
           - type: 'null'
           title: Legs
+    AccountConfigurationUpdate:
+      additionalProperties: true
+      description: Matches Alpaca account configuration fields (Oct 2025).
+      properties:
+        dtbp_check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Day-trade buying power check enforcement (none, entry, exit,
+            both).
+          title: Dtbp Check
+        fractional_trading:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Enable fractional share trading.
+          title: Fractional Trading
+        max_margin_multiplier:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Maximum intraday margin multiplier (e.g. '2', '4').
+          title: Max Margin Multiplier
+        no_shorting:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Disable all short sales when true.
+          title: No Shorting
+        pdt_check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Pattern day trading check behaviour (enforced, bypassed, entry_only).
+          title: Pdt Check
+        suspend_trade:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: If true, new orders are blocked at the account level.
+          title: Suspend Trade
+        trade_confirm_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Email preference for order confirmations (all, none, trade_activity).
+          title: Trade Confirm Email
+      title: AccountConfigurationUpdate
+      type: object
+    WatchlistEntryPatch:
+      additionalProperties: false
+      description: Payload for adding an asset to an existing watchlist.
+      properties:
+        asset_id:
+          anyOf:
+          - minLength: 1
+            type: string
+          - type: 'null'
+          description: UUID of the asset when symbol lookup is ambiguous.
+          title: Asset Id
+        symbol:
+          anyOf:
+          - minLength: 1
+            type: string
+          - type: 'null'
+          description: Ticker symbol to add (symbol or asset_id required by Oct 2025
+            docs).
+          title: Symbol
+      title: WatchlistEntryPatch
+      type: object
   securitySchemes:
     EdgeApiKey:
       type: apiKey

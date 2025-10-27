@@ -1,4 +1,4 @@
-"""Examples-only compatibility shim exposing edge.app symbols."""
+"""Examples-only shim exposing edge.app symbols (updated Oct 2025)."""
 
 from importlib import import_module
 
