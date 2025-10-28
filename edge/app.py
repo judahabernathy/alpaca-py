@@ -1674,6 +1674,29 @@ except Exception:
 
 # --- GPT Actions OpenAPI patch ---
 
+EXCLUDED_OPENAPI_OPERATIONS: Tuple[Tuple[str, str], ...] = (
+    ("/v2/orders/sync", "post"),
+    ("/v2/account/portfolio/history", "get"),
+    ("/v2/corporate_actions/announcements/{announcement_id}", "get"),
+    ("/v2/positions/{symbol_or_contract_id}/exercise", "post"),
+    ("/v2/watchlists/{watchlist_id}", "post"),
+    ("/v2/watchlists/{watchlist_id}", "delete"),
+    ("/v2/watchlists/{watchlist_id}/{symbol}", "delete"),
+)
+
+
+def _prune_openapi_operations(schema: Dict[str, Any]) -> None:
+    paths = schema.get("paths", {})
+    for path, method in EXCLUDED_OPENAPI_OPERATIONS:
+        path_item = paths.get(path)
+        if not isinstance(path_item, dict):
+            continue
+        path_item.pop(method, None)
+        remaining = [name for name in path_item if not name.startswith("x-")]
+        if not remaining:
+            paths.pop(path, None)
+
+
 def _build_openapi_schema(routes) -> Dict[str, Any]:
     schema = get_openapi(
         title="Alpaca Wrapper",
@@ -1703,7 +1726,7 @@ def _build_openapi_schema(routes) -> Dict[str, Any]:
 
     paths = schema.setdefault("paths", {})
 
-    for path, method in (("/v2/orders", "post"), ("/v2/orders/sync", "post")):
+    for path, method in (("/v2/orders", "post"),):
         operation = paths.get(path, {}).get(method)
         if isinstance(operation, dict):
             responses = operation.get("responses") or {}
@@ -1728,14 +1751,12 @@ def _build_openapi_schema(routes) -> Dict[str, Any]:
 
     consequential_operations = {
         ("/v2/orders", "post"),
-        ("/v2/orders/sync", "post"),
         ("/v2/orders", "delete"),
         ("/v2/orders/{order_id}", "delete"),
         ("/v2/positions", "delete"),
         ("/v2/positions/{symbol}", "delete"),
         ("/v2/watchlists", "post"),
         ("/v2/watchlists/{watchlist_id}", "put"),
-        ("/v2/watchlists/{watchlist_id}", "delete"),
     }
     for path, method in consequential_operations:
         operation = paths.get(path, {}).get(method)
@@ -1966,6 +1987,7 @@ def _build_openapi_schema(routes) -> Dict[str, Any]:
             },
         ]
 
+    _prune_openapi_operations(schema)
     return schema
 
 
