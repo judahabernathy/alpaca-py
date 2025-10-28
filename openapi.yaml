@@ -37,42 +37,6 @@ paths:
                     type: string
                     description: Explanation of the rate limit condition.
                 additionalProperties: true
-  /v2/orders/sync:
-    post:
-      summary: Order Create Sync
-      description: 'Synchronously mirror `/v2/orders` in the current thread.
-
-
-        Applies the limit guard (extended-hours must be DAY limit orders)
-
-        and surfaces upstream HTTP 429 responses with their `Retry-After`.'
-      operationId: order_create_sync_v2_orders_sync_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateOrder'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderResponse'
-        '409':
-          description: Business rule rejection
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/OrderRejectResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-      x-openai-isConsequential: true
   /v2/orders:
     get:
       summary: Orders List
@@ -151,31 +115,6 @@ paths:
                     description: Error message explaining why the request is unauthorized.
                 additionalProperties: true
       x-openai-isConsequential: true
-  /analysis/order-plan:
-    post:
-      summary: Review proposed Alpaca orders with GPT-5
-      description: Use GPT-5 Structured Output to review proposed orders and return
-        a JSON execution plan with adjustments and risk notes.
-      operationId: analyse_order_plan_analysis_order_plan_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrderPlanRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderPlanResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /v2/account:
     get:
       summary: Account Get
@@ -567,35 +506,6 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
       summary: Watchlists Add Asset V2
-    put:
-      operationId: watchlists_update_v2_v2_watchlists__watchlist_id__put
-      parameters:
-      - in: path
-        name: watchlist_id
-        required: true
-        schema:
-          title: Watchlist Id
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/WatchlistIn'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema: {}
-          description: Successful Response
-        '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Watchlists Update V2
-      x-openai-isConsequential: true
   /v2/quotes:
     get:
       summary: Get Quotes V2
@@ -952,188 +862,6 @@ paths:
                     description: Error message explaining why the request is unauthorized.
                 additionalProperties: true
       description: Get the current market clock.
-  /v2/corporate_actions/announcements:
-    get:
-      summary: Corporate Actions Announcements
-      operationId: corporate_actions_announcements_list_v2_corporate_actions_announcements_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: List corporate action announcements.
-      parameters:
-      - name: ca_types
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: ca_sub_types
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: symbol
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: date_type
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: start
-        in: query
-        required: false
-        schema:
-          type: string
-          format: date
-      - name: end
-        in: query
-        required: false
-        schema:
-          type: string
-          format: date
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          minimum: 1
-      - name: page_token
-        in: query
-        required: false
-        schema:
-          type: string
-  /v2/corporate_actions/announcements/{announcement_id}:
-    get:
-      summary: Corporate Actions Announcement Get
-      operationId: corporate_actions_announcement_get_v2_corporate_actions_announcements_announcement_id_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Retrieve a specific corporate action announcement.
-      parameters:
-      - name: announcement_id
-        in: path
-        required: true
-        schema:
-          type: string
-  /v2/options/contracts:
-    get:
-      summary: Option Contracts
-      operationId: option_contracts_list_v2_options_contracts_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: List option contracts.
-      parameters:
-      - name: symbol
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: status
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: contract_type
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: expiration_date
-        in: query
-        required: false
-        schema:
-          type: string
-          format: date
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          minimum: 1
-      - name: page_token
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: sort
-        in: query
-        required: false
-        schema:
-          type: string
-  /v2/options/contracts/{contract_id}:
-    get:
-      summary: Option Contract Get
-      operationId: option_contract_get_v2_options_contracts_contract_id_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Retrieve a specific option contract.
-      parameters:
-      - name: contract_id
-        in: path
-        required: true
-        schema:
-          type: string
   /v2/orders:by_client_order_id:
     get:
       summary: Order Get By Client ID
@@ -1159,34 +887,6 @@ paths:
       parameters:
       - name: client_order_id
         in: query
-        required: true
-        schema:
-          type: string
-  /v2/positions/{symbol_or_contract_id}/exercise:
-    post:
-      summary: Exercise Option Position
-      operationId: exercise_option_position_v2_positions_symbol_or_contract_id_exercise_post
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Exercise an option position for the given contract.
-      parameters:
-      - name: symbol_or_contract_id
-        in: path
         required: true
         schema:
           type: string
