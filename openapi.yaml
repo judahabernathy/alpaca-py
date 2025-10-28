@@ -47,7 +47,7 @@ paths:
           content:
             application/json:
               schema: {}
-        '401':
+        '401': &id001
           description: Unauthorized
           content:
             application/json:
@@ -103,18 +103,33 @@ paths:
           content:
             application/json:
               schema: {}
-        '401':
-          description: Unauthorized
+        '401': *id001
+      x-openai-isConsequential: true
+  /analysis/order-plan:
+    post:
+      summary: Review proposed Alpaca orders with GPT-5
+      description: Use GPT-5 Structured Output to review proposed orders and return
+        a JSON execution plan with adjustments and risk notes.
+      operationId: analyse_order_plan_analysis_order_plan_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderPlanRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      x-openai-isConsequential: true
+                $ref: '#/components/schemas/OrderPlanResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v2/account:
     get:
       summary: Account Get
@@ -125,17 +140,7 @@ paths:
           content:
             application/json:
               schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
+        '401': *id001
   /v2/account/activities:
     get:
       summary: Account Activities
@@ -209,6 +214,160 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v2/account/configurations:
+    get:
+      summary: Account Configurations Get
+      operationId: account_configurations_get_v2_account_configurations_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+    patch:
+      summary: Account Configurations Patch
+      operationId: account_configurations_patch_v2_account_configurations_patch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountConfigurationUpdate'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/assets:
+    get:
+      summary: Assets List
+      operationId: assets_list_v2_assets_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v2/assets/{asset_id_or_symbol}:
+    get:
+      summary: Assets Get
+      operationId: assets_get_v2_assets__asset_id_or_symbol__get
+      parameters:
+      - name: asset_id_or_symbol
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Asset Id Or Symbol
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/calendar:
+    get:
+      summary: Trading Calendar
+      operationId: trading_calendar_v2_calendar_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v2/clock:
+    get:
+      summary: Market Clock
+      operationId: market_clock_v2_clock_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v2/corporate_actions/announcements:
+    get:
+      summary: Corporate Actions Announcements
+      operationId: corporate_actions_announcements_v2_corporate_actions_announcements_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v2/options/contracts:
+    get:
+      summary: Options Contracts
+      operationId: options_contracts_v2_options_contracts_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v2/options/contracts/{contract_id}:
+    get:
+      summary: Options Contract Get
+      operationId: options_contract_get_v2_options_contracts__contract_id__get
+      parameters:
+      - name: contract_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Contract Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v2/orders:by_client_order_id:
+    get:
+      summary: Orders By Client Order Id
+      operationId: orders_by_client_order_id_v2_orders_by_client_order_id_get
+      parameters:
+      - name: client_order_id
+        in: query
+        required: true
+        schema:
+          type: string
+          description: Client order identifier as documented in Alpaca Trading API
+            (Oct 2025).
+          title: Client Order Id
+        description: Client order identifier as documented in Alpaca Trading API (Oct
+          2025).
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v2/orders/{order_id}:
     get:
       summary: Orders Get By Id
@@ -256,41 +415,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
       x-openai-isConsequential: true
-    patch:
-      summary: Order Replace
-      operationId: order_replace_v2_orders_order_id_patch
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Modify an existing order.
-      parameters:
-      - name: order_id
-        in: path
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Order fields to update.
-              additionalProperties: true
-        required: true
   /v2/positions:
     get:
       summary: Positions List V2
@@ -301,17 +425,7 @@ paths:
           content:
             application/json:
               schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
+        '401': *id001
     delete:
       summary: Positions Close All
       operationId: positions_close_all_v2_positions_delete
@@ -399,17 +513,7 @@ paths:
           content:
             application/json:
               schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
+        '401': *id001
     post:
       summary: Watchlists Create V2
       operationId: watchlists_create_v2_v2_watchlists_post
@@ -434,55 +538,56 @@ paths:
       x-openai-isConsequential: true
   /v2/watchlists/{watchlist_id}:
     get:
+      summary: Watchlists Get V2
       operationId: watchlists_get_v2_v2_watchlists__watchlist_id__get
       parameters:
-      - in: path
-        name: watchlist_id
+      - name: watchlist_id
+        in: path
         required: true
         schema:
-          title: Watchlist Id
           type: string
+          title: Watchlist Id
       responses:
         '200':
+          description: Successful Response
           content:
             application/json:
               schema: {}
-          description: Successful Response
         '422':
+          description: Validation Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Watchlists Get V2
-    post:
-      operationId: watchlists_add_asset_v2_v2_watchlists__watchlist_id__post
+    put:
+      summary: Watchlists Update V2
+      operationId: watchlists_update_v2_v2_watchlists__watchlist_id__put
       parameters:
-      - in: path
-        name: watchlist_id
+      - name: watchlist_id
+        in: path
         required: true
         schema:
-          title: Watchlist Id
           type: string
+          title: Watchlist Id
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/WatchlistEntryPatch'
-        required: true
+              $ref: '#/components/schemas/WatchlistIn'
       responses:
         '200':
+          description: Successful Response
           content:
             application/json:
               schema: {}
-          description: Successful Response
         '422':
+          description: Validation Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Watchlists Add Asset V2
+      x-openai-isConsequential: true
   /v2/quotes:
     get:
       summary: Get Quotes V2
@@ -612,296 +717,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
-  /v2/account/configurations:
-    get:
-      operationId: account_configurations_get_v2_account_configurations_get
-      responses:
-        '200':
-          content:
-            application/json:
-              schema: {}
-          description: Successful Response
-      summary: Account Configurations Get
-    patch:
-      operationId: account_configurations_patch_v2_account_configurations_patch
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AccountConfigurationUpdate'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema: {}
-          description: Successful Response
-        '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Account Configurations Patch
-  /v2/account/portfolio/history:
-    get:
-      summary: Portfolio History
-      operationId: portfolio_history_get_v2_account_portfolio_history_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Get portfolio equity history for the account.
-      parameters:
-      - name: period
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: timeframe
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: intraday_reporting
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: start
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: pnl_reset
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: end
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: date_end
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: cashflow_types
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: extended_hours
-        in: query
-        required: false
-        schema:
-          type: boolean
-  /v2/assets:
-    get:
-      summary: Assets List
-      operationId: assets_list_v2_assets_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: List assets available for trading.
-      parameters:
-      - name: status
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: asset_class
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: exchange
-        in: query
-        required: false
-        schema:
-          type: string
-      - name: attributes
-        in: query
-        required: false
-        schema:
-          type: string
-  /v2/assets/{asset_id_or_symbol}:
-    get:
-      summary: Asset Get
-      operationId: asset_get_v2_assets_asset_id_or_symbol_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Retrieve information about a specific asset.
-      parameters:
-      - name: asset_id_or_symbol
-        in: path
-        required: true
-        schema:
-          type: string
-  /v2/calendar:
-    get:
-      summary: Calendar
-      operationId: calendar_list_v2_calendar_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Retrieve market calendar entries.
-      parameters:
-      - name: start
-        in: query
-        required: false
-        schema:
-          type: string
-          format: date
-      - name: end
-        in: query
-        required: false
-        schema:
-          type: string
-          format: date
-  /v2/clock:
-    get:
-      summary: Clock
-      operationId: clock_get_v2_clock_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Get the current market clock.
-  /v2/orders:by_client_order_id:
-    get:
-      summary: Order Get By Client ID
-      operationId: order_get_by_client_id_v2_orders_by_client_order_id_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Retrieve an order by client order identifier.
-      parameters:
-      - name: client_order_id
-        in: query
-        required: true
-        schema:
-          type: string
-  /v2/watchlists/{watchlist_id}/{symbol}:
-    delete:
-      summary: Watchlist Remove Asset
-      operationId: watchlist_remove_asset_v2_watchlists_watchlist_id_symbol_delete
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  detail:
-                    type: string
-                    description: Error message explaining why the request is unauthorized.
-                additionalProperties: true
-      description: Remove an asset from the specified watchlist.
-      parameters:
-      - name: watchlist_id
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: symbol
-        in: path
-        required: true
-        schema:
-          type: string
 components:
   schemas:
+    AccountConfigurationUpdate:
+      properties:
+        dtbp_check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Dtbp Check
+          description: Day-trade buying power check enforcement (none, entry, exit,
+            both).
+        no_shorting:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: No Shorting
+          description: Disable all short sales when true.
+        suspend_trade:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Suspend Trade
+          description: If true, new orders are blocked at the account level.
+        trade_confirm_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Trade Confirm Email
+          description: Email preference for order confirmations (all, none, trade_activity).
+        fractional_trading:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Fractional Trading
+          description: Enable fractional share trading.
+        max_margin_multiplier:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Max Margin Multiplier
+          description: Maximum intraday margin multiplier (e.g. '2', '4').
+        pdt_check:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pdt Check
+          description: Pattern day trading check behaviour (enforced, bypassed, entry_only).
+      additionalProperties: true
+      type: object
+      title: AccountConfigurationUpdate
+      description: Matches Alpaca account configuration fields (Oct 2025).
     CreateOrder:
       properties:
         symbol:
@@ -1339,6 +1205,27 @@ components:
       - msg
       - type
       title: ValidationError
+    WatchlistEntryPatch:
+      properties:
+        symbol:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Symbol
+          description: Ticker symbol to add (symbol or asset_id required by Oct 2025
+            docs).
+        asset_id:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Asset Id
+          description: UUID of the asset when symbol lookup is ambiguous.
+      additionalProperties: false
+      type: object
+      title: WatchlistEntryPatch
+      description: Payload for adding an asset to an existing watchlist.
     WatchlistIn:
       properties:
         name:
@@ -1446,76 +1333,6 @@ components:
               additionalProperties: true
           - type: 'null'
           title: Legs
-    AccountConfigurationUpdate:
-      additionalProperties: true
-      description: Matches Alpaca account configuration fields (Oct 2025).
-      properties:
-        dtbp_check:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Day-trade buying power check enforcement (none, entry, exit,
-            both).
-          title: Dtbp Check
-        fractional_trading:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          description: Enable fractional share trading.
-          title: Fractional Trading
-        max_margin_multiplier:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Maximum intraday margin multiplier (e.g. '2', '4').
-          title: Max Margin Multiplier
-        no_shorting:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          description: Disable all short sales when true.
-          title: No Shorting
-        pdt_check:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Pattern day trading check behaviour (enforced, bypassed, entry_only).
-          title: Pdt Check
-        suspend_trade:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          description: If true, new orders are blocked at the account level.
-          title: Suspend Trade
-        trade_confirm_email:
-          anyOf:
-          - type: string
-          - type: 'null'
-          description: Email preference for order confirmations (all, none, trade_activity).
-          title: Trade Confirm Email
-      title: AccountConfigurationUpdate
-      type: object
-    WatchlistEntryPatch:
-      additionalProperties: false
-      description: Payload for adding an asset to an existing watchlist.
-      properties:
-        asset_id:
-          anyOf:
-          - minLength: 1
-            type: string
-          - type: 'null'
-          description: UUID of the asset when symbol lookup is ambiguous.
-          title: Asset Id
-        symbol:
-          anyOf:
-          - minLength: 1
-            type: string
-          - type: 'null'
-          description: Ticker symbol to add (symbol or asset_id required by Oct 2025
-            docs).
-          title: Symbol
-      title: WatchlistEntryPatch
-      type: object
   securitySchemes:
     EdgeApiKey:
       type: apiKey
@@ -1525,4 +1342,4 @@ jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 security:
 - EdgeApiKey: []
 servers:
-- url: https://alpaca-py-production.up.railway.app
+- url: alpaca-py-production.up.railway.app
