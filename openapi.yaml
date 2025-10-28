@@ -433,29 +433,6 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
       x-openai-isConsequential: true
   /v2/watchlists/{watchlist_id}:
-    delete:
-      operationId: watchlists_delete_v2_v2_watchlists__watchlist_id__delete
-      parameters:
-      - in: path
-        name: watchlist_id
-        required: true
-        schema:
-          title: Watchlist Id
-          type: string
-      responses:
-        '200':
-          content:
-            application/json:
-              schema: {}
-          description: Successful Response
-        '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
-      summary: Watchlists Delete V2
-      x-openai-isConsequential: true
     get:
       operationId: watchlists_get_v2_v2_watchlists__watchlist_id__get
       parameters:
