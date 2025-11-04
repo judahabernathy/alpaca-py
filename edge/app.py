@@ -17,8 +17,7 @@ from fastapi import FastAPI, Header, HTTPException, Query, Request, status, Body
 from fastapi.params import Param
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import JSONResponse, Response, FileResponse
-from starlette.responses import EventSourceResponse
+from fastapi.responses import JSONResponse, Response, FileResponse, StreamingResponse
 import anyio
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -111,6 +110,18 @@ def _build_default_order_plan_prompt() -> Optional[Dict[str, Any]]:
 configure_logging()
 
 _ORDER_PLAN_PROMPT_DEFAULT = _build_default_order_plan_prompt()
+
+
+
+def _sse_event(event: str, payload: object) -> bytes:
+    """Render a Server-Sent Event payload."""
+
+    if isinstance(payload, str):
+        data = payload
+    else:
+        data = json.dumps(payload, separators=(",", ":"))
+    message = f"event: {event}\ndata: {data}\n\n"
+    return message.encode("utf-8")
 
 
 class OrderReject(Exception):
@@ -1172,7 +1183,7 @@ async def _iter_order_plan_text(stream: Any) -> AsyncGenerator[str, None]:
 async def _stream_order_plan_model(
     context: Dict[str, Any],
     prompt: Optional[Dict[str, Any]],
-) -> AsyncGenerator[Dict[str, str], None]:
+) -> AsyncGenerator[bytes, None]:
     client = _get_openai_client()
     system_prompt = dedent(
         """
@@ -1213,30 +1224,30 @@ async def _stream_order_plan_model(
         async with client.responses.stream(**stream_kwargs) as stream:
             async for chunk in _iter_order_plan_text(stream):
                 has_yielded = True
-                yield {"event": "delta", "data": chunk}
+                yield _sse_event("delta", chunk)
             final = await stream.get_final_response()
     except ValidationError as exc:
         detail = f"OpenAI payload validation failed: {exc}"
         if has_yielded:
-            yield {"event": "error", "data": detail}
+            yield _sse_event("error", detail)
             return
         raise HTTPException(status_code=502, detail=detail) from exc
     except APIConnectionError as exc:
         detail = f"OpenAI connection error: {exc}"
         if has_yielded:
-            yield {"event": "error", "data": detail}
+            yield _sse_event("error", detail)
             return
         raise HTTPException(status_code=502, detail=detail) from exc
     except APIStatusError as exc:
         detail = f"OpenAI API error: {exc.status_code}"
         if has_yielded:
-            yield {"event": "error", "data": detail}
+            yield _sse_event("error", detail)
             return
         raise HTTPException(status_code=502, detail=detail) from exc
     except OpenAIError as exc:
         detail = f"OpenAI error: {exc}"
         if has_yielded:
-            yield {"event": "error", "data": detail}
+            yield _sse_event("error", detail)
             return
         raise HTTPException(status_code=502, detail=detail) from exc
     else:
@@ -1245,10 +1256,10 @@ async def _stream_order_plan_model(
         except HTTPException as exc:
             detail = str(exc.detail)
             if has_yielded:
-                yield {"event": "error", "data": detail}
+                yield _sse_event("error", detail)
                 return
             raise
-        yield {"event": "result", "data": result.model_dump_json()}
+        yield _sse_event("result", result.model_dump_json())
 
 
 
@@ -1267,12 +1278,12 @@ async def analyse_order_plan(
         False,
         description="Stream the GPT analysis via server-sent events when true.",
     ),
-) -> Union[OrderPlanResponse, EventSourceResponse]:
+) -> Union[OrderPlanResponse, StreamingResponse]:
     _require_gateway_key_from_request(request)
     context = await _collect_order_plan_context(payload)
     prompt_payload = _resolve_order_plan_prompt(payload.prompt)
     if stream:
-        return EventSourceResponse(
+        return StreamingResponse(
             _stream_order_plan_model(context, prompt_payload),
             media_type="text/event-stream",
         )
@@ -1406,12 +1417,12 @@ async def analyse_order_plan(
         False,
         description="Stream the GPT analysis via server-sent events when true.",
     ),
-) -> Union[OrderPlanResponse, EventSourceResponse]:
+) -> Union[OrderPlanResponse, StreamingResponse]:
     _require_gateway_key_from_request(request)
     context = await _collect_order_plan_context(payload)
     prompt_payload = _resolve_order_plan_prompt(payload.prompt)
     if stream:
-        return EventSourceResponse(
+        return StreamingResponse(
             _stream_order_plan_model(context, prompt_payload),
             media_type="text/event-stream",
         )
