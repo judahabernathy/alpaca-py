@@ -1681,7 +1681,9 @@ EXCLUDED_OPENAPI_OPERATIONS: Tuple[Tuple[str, str], ...] = (
     ("/v2/positions/{symbol_or_contract_id}/exercise", "post"),
     ("/v2/watchlists/{watchlist_id}", "post"),
     ("/v2/watchlists/{watchlist_id}", "delete"),
-    ("/v2/watchlists/{watchlist_id}/{symbol}", "delete"),
+        ("/v2/watchlists/{watchlist_id}/{symbol}", "delete"),
+    ("/v2/options/contracts", "get"),
+    ("/v2/options/contracts/{contract_id}", "get"),
 )
 
 
