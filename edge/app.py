@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Union, cast, Literal, Tuple
+from typing import Any, Dict, List, Optional, Union, cast, Literal, Tuple, AsyncGenerator
 from uuid import uuid4
 from urllib.parse import urlparse, urlunparse
 
@@ -18,6 +18,7 @@ from fastapi.params import Param
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, Response, FileResponse
+from starlette.responses import EventSourceResponse
 import anyio
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -65,7 +66,51 @@ try:
 except ValueError:
     OPENAI_TIMEOUT = 45.0
 
+
+def _read_prompt_variables_env(var_name: str) -> Optional[Dict[str, Any]]:
+    raw = os.getenv(var_name)
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        log_error(
+            "prompt_variables_env_invalid",
+            {
+                "env_var": var_name,
+                "reason": "json_decode",
+            },
+        )
+        return None
+    if not isinstance(parsed, dict):
+        log_error(
+            "prompt_variables_env_invalid",
+            {
+                "env_var": var_name,
+                "reason": "not_mapping",
+            },
+        )
+        return None
+    return parsed
+
+
+def _build_default_order_plan_prompt() -> Optional[Dict[str, Any]]:
+    prompt_id = (os.getenv("ORDER_PLAN_PROMPT_ID") or "").strip()
+    if not prompt_id:
+        _read_prompt_variables_env("ORDER_PLAN_PROMPT_VARIABLES")
+        return None
+    prompt: Dict[str, Any] = {"id": prompt_id}
+    prompt_version = (os.getenv("ORDER_PLAN_PROMPT_VERSION") or "").strip()
+    if prompt_version:
+        prompt["version"] = prompt_version
+    variables = _read_prompt_variables_env("ORDER_PLAN_PROMPT_VARIABLES")
+    if variables:
+        prompt["variables"] = variables
+    return prompt
+
 configure_logging()
+
+_ORDER_PLAN_PROMPT_DEFAULT = _build_default_order_plan_prompt()
 
 
 class OrderReject(Exception):
@@ -544,6 +589,42 @@ class OrderIntent(BaseModel):
     )
 
 
+
+
+class PromptTemplate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: Optional[str] = Field(
+        None,
+        min_length=1,
+        description="Prompt template identifier registered with OpenAI.",
+    )
+    version: Optional[str] = Field(
+        None,
+        min_length=1,
+        description="Prompt template version to request.",
+    )
+    variables: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Optional variable substitutions to inject into the prompt template.",
+    )
+
+
+class PromptMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(..., min_length=1, description="Prompt template identifier.")
+    version: Optional[str] = Field(
+        None,
+        min_length=1,
+        description="Prompt template version.",
+    )
+    variables: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Default variables supplied with the prompt template.",
+    )
+
+
 class OrderPlanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -556,6 +637,12 @@ class OrderPlanRequest(BaseModel):
         max_length=500,
         description="Additional risk or compliance constraints for the model to respect.",
     )
+
+
+prompt: Optional[PromptTemplate] = Field(
+    None,
+    description="Optional reusable prompt template reference for the GPT call.",
+)
 
 
 class OrderPlanAdjustment(BaseModel):
@@ -951,7 +1038,37 @@ async def _collect_order_plan_context(payload: OrderPlanRequest) -> Dict[str, An
     return context
 
 
-async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
+
+def _resolve_order_plan_prompt(request_prompt: Optional[PromptTemplate]) -> Optional[Dict[str, Any]]:
+    resolved: Dict[str, Any] = {}
+    default_prompt = _ORDER_PLAN_PROMPT_DEFAULT or {}
+    if default_prompt:
+        resolved.update(default_prompt)
+    user_override: Dict[str, Any] = {}
+    if request_prompt is not None:
+        user_override = request_prompt.model_dump(exclude_none=True)
+    default_variables = default_prompt.get("variables") if isinstance(default_prompt, dict) else None
+    user_variables = user_override.pop("variables", None)
+    merged_variables: Dict[str, Any] = {}
+    if isinstance(default_variables, dict):
+        merged_variables.update(default_variables)
+    if isinstance(user_variables, dict):
+        merged_variables.update(user_variables)
+    if merged_variables:
+        resolved["variables"] = merged_variables
+    elif "variables" in resolved:
+        resolved.pop("variables", None)
+    resolved.update(user_override)
+    if not resolved.get("id"):
+        return None
+    return resolved
+
+
+
+async def _call_order_plan_model(
+    context: Dict[str, Any],
+    prompt: Optional[Dict[str, Any]] = None,
+) -> OrderPlanResponse:
     client = _get_openai_client()
     system_prompt = dedent(
         """
@@ -968,29 +1085,46 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
 
     last_validation_error: ValidationError | None = None
     parsed: Any | None = None
+    base_user_content = [
+        {"type": "input_text", "text": "JSON schema (strict): " + schema_json},
+        {
+            "type": "input_text",
+            "text": "Evaluate the proposed Alpaca orders and respond with the JSON schema.",
+        },
+        {"type": "input_text", "text": payload_text},
+    ]
+
     for attempt in range(2):
-        user_content = [
-            {"type": "input_text", "text": "JSON schema (strict): " + schema_json},
-            {"type": "input_text", "text": "Evaluate the proposed Alpaca orders and respond with the JSON schema."},
-            {"type": "input_text", "text": payload_text},
-        ]
+        user_content = list(base_user_content)
         if attempt:
-            user_content.insert(0, {"type": "input_text", "text": "Retry: the last response was invalid JSON. Return only valid JSON that matches the schema."})
+            user_content.insert(
+                0,
+                {
+                    "type": "input_text",
+                    "text": "Retry: the last response was invalid JSON. Return only valid JSON that matches the schema.",
+                },
+            )
         try:
-            parsed = await client.responses.parse(
-                model=OPENAI_MODEL,
-                input=[
+            kwargs: Dict[str, Any] = {
+                "model": OPENAI_MODEL,
+                "input": [
                     {"role": "system", "content": [{"type": "input_text", "text": system_prompt}]},
                     {"role": "user", "content": user_content},
                 ],
-                max_output_tokens=1800,
-                text_format=OrderPlanResponse,
-            )
+                "max_output_tokens": 1800,
+                "text_format": OrderPlanResponse,
+            }
+            if prompt:
+                kwargs["prompt"] = prompt
+            parsed = await client.responses.parse(**kwargs)
             break
         except ValidationError as exc:
             last_validation_error = exc
             if attempt == 1:
-                raise HTTPException(status_code=502, detail=f"OpenAI payload validation failed: {exc}") from exc
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"OpenAI payload validation failed: {exc}",
+                ) from exc
             continue
         except APIConnectionError as exc:
             raise HTTPException(status_code=502, detail=f"OpenAI connection error: {exc}") from exc
@@ -1000,15 +1134,23 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
             raise HTTPException(status_code=502, detail=f"OpenAI error: {exc}") from exc
 
     if parsed is None:
-        raise HTTPException(status_code=502, detail=f"OpenAI payload validation failed: {last_validation_error}") from last_validation_error
+        raise HTTPException(
+            status_code=502,
+            detail=f"OpenAI payload validation failed: {last_validation_error}",
+        ) from last_validation_error
 
+    return _coerce_order_plan_response(parsed)
+
+
+
+def _coerce_order_plan_response(parsed: Any) -> OrderPlanResponse:
     if isinstance(parsed, OrderPlanResponse):
         return parsed
     candidate = getattr(parsed, "parsed", None)
     if isinstance(candidate, OrderPlanResponse):
         return candidate
     if hasattr(parsed, "output"):
-        for item in getattr(parsed, "output", []):
+        for item in getattr(parsed, "output", []) or []:
             for content in getattr(item, "content", []) or []:
                 candidate = getattr(content, "parsed", None)
                 if isinstance(candidate, OrderPlanResponse):
@@ -1017,6 +1159,145 @@ async def _call_order_plan_model(context: Dict[str, Any]) -> OrderPlanResponse:
         return OrderPlanResponse.model_validate(parsed)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=502, detail=f"OpenAI payload validation failed: {exc}") from exc
+
+
+async def _iter_order_plan_text(stream: Any) -> AsyncGenerator[str, None]:
+    async for event in stream:
+        if getattr(event, "type", "") == "response.output_text.delta":
+            delta = getattr(event, "delta", None)
+            if delta:
+                yield str(delta)
+
+
+async def _stream_order_plan_model(
+    context: Dict[str, Any],
+    prompt: Optional[Dict[str, Any]],
+) -> AsyncGenerator[Dict[str, str], None]:
+    client = _get_openai_client()
+    system_prompt = dedent(
+        """
+        You are a trading operations specialist assisting with Alpaca order intake.
+        Review the proposed orders, account snapshot, open positions, and any open orders.
+        Respond strictly with the provided JSON schema, focusing on compliance, sizing,
+        margin usage, and duplicate or conflicting orders. Keep reasoning concise and
+        guidance actionable.
+        """
+    ).strip()
+
+    payload_text = json.dumps(context, ensure_ascii=False)
+    schema_json = json.dumps(OrderPlanResponse.model_json_schema(), ensure_ascii=False)
+    user_content = [
+        {"type": "input_text", "text": "JSON schema (strict): " + schema_json},
+        {
+            "type": "input_text",
+            "text": "Evaluate the proposed Alpaca orders and respond with the JSON schema.",
+        },
+        {"type": "input_text", "text": payload_text},
+    ]
+
+    stream_kwargs: Dict[str, Any] = {
+        "model": OPENAI_MODEL,
+        "input": [
+            {"role": "system", "content": [{"type": "input_text", "text": system_prompt}]},
+            {"role": "user", "content": user_content},
+        ],
+        "max_output_tokens": 1800,
+        "text_format": OrderPlanResponse,
+    }
+    if prompt:
+        stream_kwargs["prompt"] = prompt
+
+    has_yielded = False
+
+    try:
+        async with client.responses.stream(**stream_kwargs) as stream:
+            async for chunk in _iter_order_plan_text(stream):
+                has_yielded = True
+                yield {"event": "delta", "data": chunk}
+            final = await stream.get_final_response()
+    except ValidationError as exc:
+        detail = f"OpenAI payload validation failed: {exc}"
+        if has_yielded:
+            yield {"event": "error", "data": detail}
+            return
+        raise HTTPException(status_code=502, detail=detail) from exc
+    except APIConnectionError as exc:
+        detail = f"OpenAI connection error: {exc}"
+        if has_yielded:
+            yield {"event": "error", "data": detail}
+            return
+        raise HTTPException(status_code=502, detail=detail) from exc
+    except APIStatusError as exc:
+        detail = f"OpenAI API error: {exc.status_code}"
+        if has_yielded:
+            yield {"event": "error", "data": detail}
+            return
+        raise HTTPException(status_code=502, detail=detail) from exc
+    except OpenAIError as exc:
+        detail = f"OpenAI error: {exc}"
+        if has_yielded:
+            yield {"event": "error", "data": detail}
+            return
+        raise HTTPException(status_code=502, detail=detail) from exc
+    else:
+        try:
+            result = _coerce_order_plan_response(final)
+        except HTTPException as exc:
+            detail = str(exc.detail)
+            if has_yielded:
+                yield {"event": "error", "data": detail}
+                return
+            raise
+        yield {"event": "result", "data": result.model_dump_json()}
+
+
+
+
+
+@app.post(
+    "/analysis/order-plan",
+    response_model=OrderPlanResponse,
+    summary="Review proposed Alpaca orders with GPT-5",
+    description="Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
+)
+async def analyse_order_plan(
+    payload: OrderPlanRequest,
+    request: Request,
+    stream: bool = Query(
+        False,
+        description="Stream the GPT analysis via server-sent events when true.",
+    ),
+) -> Union[OrderPlanResponse, EventSourceResponse]:
+    _require_gateway_key_from_request(request)
+    context = await _collect_order_plan_context(payload)
+    prompt_payload = _resolve_order_plan_prompt(payload.prompt)
+    if stream:
+        return EventSourceResponse(
+            _stream_order_plan_model(context, prompt_payload),
+            media_type="text/event-stream",
+        )
+    result = await _call_order_plan_model(context, prompt_payload)
+    return result
+
+
+@app.get(
+    "/metadata/prompts",
+    response_model=Dict[str, PromptMetadata],
+    summary="List reusable prompt templates",
+    description="Surface the prompt template identifiers and versions used by the edge service.",
+)
+async def list_prompt_metadata() -> Dict[str, PromptMetadata]:
+    defaults = _ORDER_PLAN_PROMPT_DEFAULT or {}
+    prompt_id = defaults.get("id") or "order_plan.default"
+    metadata = PromptMetadata(
+        id=prompt_id,
+        version=defaults.get("version"),
+        variables=defaults.get("variables"),
+    )
+    return {"order_plan": metadata}
+
+
+
 def _serialise_query_params(values: Any) -> Optional[Union[Dict[str, str], List[Tuple[str, str]]]]:
     """Preserve duplicate query keys when forwarding upstream."""
     if values is None:
@@ -1118,11 +1399,27 @@ async def order_create(
     summary="Review proposed Alpaca orders with GPT-5",
     description="Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
 )
-async def analyse_order_plan(payload: OrderPlanRequest, request: Request) -> OrderPlanResponse:
+async def analyse_order_plan(
+    payload: OrderPlanRequest,
+    request: Request,
+    stream: bool = Query(
+        False,
+        description="Stream the GPT analysis via server-sent events when true.",
+    ),
+) -> Union[OrderPlanResponse, EventSourceResponse]:
     _require_gateway_key_from_request(request)
     context = await _collect_order_plan_context(payload)
-    result = await _call_order_plan_model(context)
+    prompt_payload = _resolve_order_plan_prompt(payload.prompt)
+    if stream:
+        return EventSourceResponse(
+            _stream_order_plan_model(context, prompt_payload),
+            media_type="text/event-stream",
+        )
+    result = await _call_order_plan_model(context, prompt_payload)
     return result
+
+
+
 
 
 @app.get("/v2/account")
