@@ -157,45 +157,6 @@
         "x-openai-isConsequential": true
       }
     },
-    "/analysis/order-plan": {
-      "post": {
-        "summary": "Review proposed Alpaca orders with GPT-5",
-        "description": "Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
-        "operationId": "analyse_order_plan_analysis_order_plan_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OrderPlanRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderPlanResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v2/account": {
       "get": {
         "summary": "Account Get",
@@ -514,59 +475,6 @@
             "content": {
               "application/json": {
                 "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v2/options/contracts": {
-      "get": {
-        "summary": "Options Contracts",
-        "operationId": "options_contracts_v2_options_contracts_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v2/options/contracts/{contract_id}": {
-      "get": {
-        "summary": "Options Contract Get",
-        "operationId": "options_contract_get_v2_options_contracts__contract_id__get",
-        "parameters": [
-          {
-            "name": "contract_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Contract Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
               }
             }
           }
@@ -1176,6 +1084,45 @@
                     "additionalProperties": true
                   },
                   "title": "Response Get Bars V2 V2 Bars Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/order-plan": {
+      "post": {
+        "summary": "Review proposed Alpaca orders with GPT-5",
+        "description": "Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
+        "operationId": "analyse_order_plan_analysis_order_plan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPlanResponse"
                 }
               }
             }
