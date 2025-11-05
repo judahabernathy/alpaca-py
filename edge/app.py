@@ -636,6 +636,15 @@ class PromptMetadata(BaseModel):
     )
 
 
+class PromptMetadataResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    order_plan: PromptMetadata = Field(
+        ...,
+        description="Metadata describing the order-plan prompt template.",
+    )
+
+
 class OrderPlanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -1292,11 +1301,11 @@ async def analyse_order_plan(
 
 @app.get(
     "/metadata/prompts",
-    response_model=Dict[str, PromptMetadata],
+    response_model=PromptMetadataResponse,
     summary="List reusable prompt templates",
     description="Surface the prompt template identifiers and versions used by the edge service.",
 )
-async def list_prompt_metadata() -> Dict[str, PromptMetadata]:
+async def list_prompt_metadata() -> PromptMetadataResponse:
     defaults = _ORDER_PLAN_PROMPT_DEFAULT or {}
     prompt_id = defaults.get("id") or "order_plan.default"
     metadata = PromptMetadata(
@@ -1304,7 +1313,7 @@ async def list_prompt_metadata() -> Dict[str, PromptMetadata]:
         version=defaults.get("version"),
         variables=defaults.get("variables"),
     )
-    return {"order_plan": metadata}
+    return PromptMetadataResponse(order_plan=metadata)
 
 
 
@@ -2315,5 +2324,3 @@ app.openapi = _custom_openapi  # type: ignore[method-assign]
 
 
 # --- end patch ---
-
-
