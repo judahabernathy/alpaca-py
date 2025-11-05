@@ -1750,6 +1750,17 @@
             ],
             "title": "Risk Notes",
             "description": "Additional risk or compliance constraints for the model to respect."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "": "#/components/schemas/PromptTemplate"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional reusable prompt template reference for the GPT call."
           }
         },
         "additionalProperties": false,

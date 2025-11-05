@@ -1,1 +1,1901 @@
-{"openapi":"3.1.0","info":{"title":"Alpaca Wrapper","version":"1.1.0","description":"All endpoints require the `X-API-Key` header; the `api_key` query parameter is\nsupported as a compatibility fallback. The service propagates Alpaca's rate\nlimits as HTTP 429 responses and surfaces the upstream `Retry-After` header.\nWhen `extended_hours` is enabled the order payload must remain a DAY limit\norder, include `limit_price`, and omit advanced `order_class` values.","license":{"name":"Proprietary","url":"https://alpaca-py-production.up.railway.app/legal"}},"paths":{"/healthz":{"get":{"summary":"Healthz","operationId":"healthz_healthz_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"429":{"description":"Rate limited","content":{"application/json":{"schema":{"type":"object","properties":{"detail":{"type":"string","description":"Explanation of the rate limit condition."}},"additionalProperties":true}}}}}}},"/v2/orders/sync":{"post":{"summary":"Order Create Sync","description":"Synchronously mirror `/v2/orders` in the current thread.\n\nApplies the limit guard (extended-hours must be DAY limit orders)\nand surfaces upstream HTTP 429 responses with their `Retry-After`.","operationId":"order_create_sync_v2_orders_sync_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateOrder"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}},"x-openai-isConsequential":true}},"/v2/orders":{"get":{"summary":"Orders List","operationId":"orders_list_v2_orders_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"401":{"description":"Unauthorized","content":{"application/json":{"schema":{"type":"object","properties":{"detail":{"type":"string","description":"Error message explaining why the request is unauthorized."}},"additionalProperties":true}}}}}},"post":{"summary":"Order Create","description":"Submit an order via Alpaca's `/v2/orders`.\n\nRequires `X-API-Key`, forwards 429 responses with `Retry-After`, and\napplies the limit guard (extended-hours must be DAY limit orders).","operationId":"order_create_v2_orders_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateOrder"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}},"x-openai-isConsequential":true},"delete":{"summary":"Orders Cancel All","description":"Cancel all open orders.","operationId":"orders_cancel_all_v2_orders_delete","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"401":{"description":"Unauthorized","content":{"application/json":{"schema":{"type":"object","properties":{"detail":{"type":"string","description":"Error message explaining why the request is unauthorized."}},"additionalProperties":true}}}}},"x-openai-isConsequential":true}},"/analysis/order-plan":{"post":{"summary":"Review proposed Alpaca orders with GPT-5","description":"Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.","operationId":"analyse_order_plan_analysis_order_plan_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderPlanRequest"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderPlanResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/v2/account":{"get":{"summary":"Account Get","operationId":"account_get_v2_account_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"401":{"description":"Unauthorized","content":{"application/json":{"schema":{"type":"object","properties":{"detail":{"type":"string","description":"Error message explaining why the request is unauthorized."}},"additionalProperties":true}}}}}}},"/v2/account/activities":{"get":{"summary":"Account Activities","operationId":"account_activities_v2_account_activities_get","parameters":[{"name":"activity_type","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Activity Type"}},{"name":"date","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Date"}},{"name":"until","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Until"}},{"name":"after","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"After"}},{"name":"direction","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Direction"}},{"name":"page_size","in":"query","required":false,"schema":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Page Size"}},{"name":"page_token","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Page Token"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/v2/orders/{order_id}":{"get":{"summary":"Orders Get By Id","operationId":"orders_get_by_id_v2_orders__order_id__get","parameters":[{"name":"order_id","in":"path","required":true,"schema":{"type":"string","title":"Order Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"delete":{"summary":"Orders Cancel By Id","description":"Cancel a specific order by id.","operationId":"orders_cancel_by_id_v2_orders__order_id__delete","parameters":[{"name":"order_id","in":"path","required":true,"schema":{"type":"string","title":"Order Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}},"x-openai-isConsequential":true}},"/v2/positions":{"get":{"summary":"Positions List V2","operationId":"positions_list_v2_v2_positions_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"401":{"description":"Unauthorized","content":{"application/json":{"schema":{"type":"object","properties":{"detail":{"type":"string","description":"Error message explaining why the request is unauthorized."}},"additionalProperties":true}}}}}},"delete":{"summary":"Positions Close All","operationId":"positions_close_all_v2_positions_delete","parameters":[{"name":"cancel_orders","in":"query","required":false,"schema":{"type":"boolean","default":false,"title":"Cancel Orders"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}},"x-openai-isConsequential":true}},"/v2/positions/{symbol}":{"get":{"summary":"Positions Get","operationId":"positions_get_v2_positions__symbol__get","parameters":[{"name":"symbol","in":"path","required":true,"schema":{"type":"string","title":"Symbol"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"delete":{"summary":"Positions Close","operationId":"positions_close_v2_positions__symbol__delete","parameters":[{"name":"symbol","in":"path","required":true,"schema":{"type":"string","title":"Symbol"}},{"name":"cancel_orders","in":"query","required":false,"schema":{"type":"boolean","default":false,"title":"Cancel Orders"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}},"x-openai-isConsequential":true}},"/v2/watchlists":{"get":{"summary":"Watchlists List V2","operationId":"watchlists_list_v2_v2_watchlists_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"401":{"description":"Unauthorized","content":{"application/json":{"schema":{"type":"object","properties":{"detail":{"type":"string","description":"Error message explaining why the request is unauthorized."}},"additionalProperties":true}}}}}},"post":{"summary":"Watchlists Create V2","operationId":"watchlists_create_v2_v2_watchlists_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/WatchlistIn"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}},"x-openai-isConsequential":true}},"/v2/watchlists/{watchlist_id}":{"get":{"summary":"Watchlists Get V2","operationId":"watchlists_get_v2_v2_watchlists__watchlist_id__get","parameters":[{"name":"watchlist_id","in":"path","required":true,"schema":{"type":"string","title":"Watchlist Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"put":{"summary":"Watchlists Update V2","operationId":"watchlists_update_v2_v2_watchlists__watchlist_id__put","parameters":[{"name":"watchlist_id","in":"path","required":true,"schema":{"type":"string","title":"Watchlist Id"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/WatchlistIn"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}},"x-openai-isConsequential":true},"delete":{"summary":"Watchlists Delete V2","operationId":"watchlists_delete_v2_v2_watchlists__watchlist_id__delete","parameters":[{"name":"watchlist_id","in":"path","required":true,"schema":{"type":"string","title":"Watchlist Id"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}},"x-openai-isConsequential":true}},"/v2/quotes":{"get":{"summary":"Get Quotes V2","operationId":"get_quotes_v2_v2_quotes_get","parameters":[{"name":"symbol","in":"query","required":true,"schema":{"type":"string","title":"Symbol"}},{"name":"start","in":"query","required":true,"schema":{"type":"string","title":"Start"}},{"name":"end","in":"query","required":true,"schema":{"type":"string","title":"End"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"type":"object","additionalProperties":true},"title":"Response Get Quotes V2 V2 Quotes Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/v2/trades":{"get":{"summary":"Get Trades V2","operationId":"get_trades_v2_v2_trades_get","parameters":[{"name":"symbol","in":"query","required":true,"schema":{"type":"string","title":"Symbol"}},{"name":"start","in":"query","required":true,"schema":{"type":"string","title":"Start"}},{"name":"end","in":"query","required":true,"schema":{"type":"string","title":"End"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"type":"object","additionalProperties":true},"title":"Response Get Trades V2 V2 Trades Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/v2/bars":{"get":{"summary":"Get Bars V2","operationId":"get_bars_v2_v2_bars_get","parameters":[{"name":"symbol","in":"query","required":true,"schema":{"type":"string","title":"Symbol"}},{"name":"timeframe","in":"query","required":false,"schema":{"type":"string","default":"1Day","title":"Timeframe"}},{"name":"start","in":"query","required":true,"schema":{"type":"string","title":"Start"}},{"name":"end","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"End"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"type":"object","additionalProperties":true},"title":"Response Get Bars V2 V2 Bars Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}}},"components":{"schemas":{"CreateOrder":{"properties":{"symbol":{"type":"string","title":"Symbol"},"side":{"type":"string","title":"Side","enum":["buy","sell"]},"qty":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Qty"},"notional":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Notional"},"type":{"type":"string","title":"Type","enum":["market","limit","stop","stop_limit","trailing_stop"]},"time_in_force":{"type":"string","title":"Time In Force","enum":["day","gtc","opg","cls","ioc","fok"]},"limit_price":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Limit Price"},"stop_price":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Stop Price"},"order_class":{"anyOf":[{"type":"string","enum":["simple","bracket","oco","oto"]},{"type":"null"}],"title":"Order Class"},"take_profit":{"anyOf":[{"$ref":"#/components/schemas/TakeProfitLeg"},{"type":"null"}]},"stop_loss":{"anyOf":[{"$ref":"#/components/schemas/StopLossLeg"},{"type":"null"}]},"extended_hours":{"anyOf":[{"type":"boolean"},{"type":"null"}],"title":"Extended Hours"},"trail_price":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Trail Price"},"trail_percent":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Trail Percent"},"client_order_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Client Order Id"}},"additionalProperties":false,"type":"object","required":["symbol","side","type","time_in_force"],"title":"CreateOrder","oneOf":[{"required":["qty"],"properties":{"qty":{"type":"number"}},"not":{"required":["notional"]}},{"required":["notional"],"properties":{"notional":{"type":"number"}},"not":{"required":["qty"]}}]},"HTTPValidationError":{"properties":{"detail":{"items":{"$ref":"#/components/schemas/ValidationError"},"type":"array","title":"Detail"}},"type":"object","title":"HTTPValidationError"},"OrderIntent":{"properties":{"symbol":{"type":"string","maxLength":12,"minLength":1,"title":"Symbol","description":"Ticker symbol to trade."},"side":{"type":"string","enum":["buy","sell"],"title":"Side","description":"Order side."},"order_type":{"type":"string","maxLength":24,"minLength":2,"title":"Order Type","description":"Order type, e.g. market or limit."},"time_in_force":{"anyOf":[{"type":"string","maxLength":12},{"type":"null"}],"title":"Time In Force","description":"Time-in-force directive such as day or gtc."},"qty":{"anyOf":[{"type":"number","minimum":0.0},{"type":"null"}],"title":"Qty","description":"Quantity of shares to trade."},"notional":{"anyOf":[{"type":"number","minimum":0.0},{"type":"null"}],"title":"Notional","description":"Target notional in USD when quantity is omitted."},"limit_price":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Limit Price","description":"Limit price for limit or stop-limit orders."},"stop_price":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Stop Price","description":"Top-level stop price for standalone stop or stop-limit orders."},"trail_price":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Trail Price","description":"Trailing stop price (ignored unless type is trailing_stop)."},"trail_percent":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Trail Percent","description":"Trailing stop percentage (ignored unless type is trailing_stop)."},"take_profit":{"anyOf":[{"$ref":"#/components/schemas/TakeProfitLeg"},{"type":"null"}],"description":"Optional take-profit child order details."},"stop_loss":{"anyOf":[{"$ref":"#/components/schemas/StopLossLeg"},{"type":"null"}],"description":"Optional stop-loss child order details."},"notes":{"anyOf":[{"type":"string","maxLength":400},{"type":"null"}],"title":"Notes","description":"Additional human context about the order intent."}},"additionalProperties":false,"type":"object","required":["symbol","side","order_type"],"title":"OrderIntent"},"OrderPlanAdjustment":{"properties":{"field":{"type":"string","title":"Field","description":"Order field to adjust, e.g. limit_price."},"suggested_value":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Suggested Value","description":"Suggested replacement value, expressed as a string."},"rationale":{"type":"string","title":"Rationale","description":"Reason for adjusting this field."}},"additionalProperties":false,"type":"object","required":["field","rationale"],"title":"OrderPlanAdjustment"},"OrderPlanItem":{"properties":{"symbol":{"type":"string","title":"Symbol","description":"Symbol under review."},"side":{"type":"string","enum":["buy","sell"],"title":"Side","description":"Side of the proposed trade."},"status":{"type":"string","enum":["approve","revise","reject"],"title":"Status","description":"High-level recommendation for the order."},"summary":{"type":"string","title":"Summary","description":"Short natural-language summary of the guidance."},"reasoning":{"items":{"type":"string"},"type":"array","title":"Reasoning","description":"Key reasoning bullet points."},"adjustments":{"items":{"$ref":"#/components/schemas/OrderPlanAdjustment"},"type":"array","title":"Adjustments","description":"Structured adjustments before execution."},"risk_flags":{"items":{"type":"string"},"type":"array","title":"Risk Flags","description":"Risks or guardrails to call out."}},"additionalProperties":false,"type":"object","required":["symbol","side","status","summary"],"title":"OrderPlanItem"},"OrderPlanRequest":{"properties":{"orders":{"items":{"$ref":"#/components/schemas/OrderIntent"},"type":"array","minItems":1,"title":"Orders","description":"Orders to evaluate."},"include_account":{"type":"boolean","title":"Include Account","description":"Include Alpaca account snapshot in the analysis context.","default":true},"include_positions":{"type":"boolean","title":"Include Positions","description":"Include open positions to highlight sizing overlaps.","default":true},"include_open_orders":{"type":"boolean","title":"Include Open Orders","description":"Include currently open orders to detect duplicates.","default":false},"risk_notes":{"anyOf":[{"type":"string","maxLength":500},{"type":"null"}],"title":"Risk Notes","description":"Additional risk or compliance constraints for the model to respect."}},"additionalProperties":false,"type":"object","required":["orders"],"title":"OrderPlanRequest"},"OrderPlanResponse":{"properties":{"execution_ready":{"type":"boolean","title":"Execution Ready","description":"Whether the orders can be sent as-is."},"plan_summary":{"type":"string","title":"Plan Summary","description":"Overall synopsis of the execution plan."},"orders":{"items":{"$ref":"#/components/schemas/OrderPlanItem"},"type":"array","title":"Orders","description":"Per-order recommendations."},"account_notes":{"items":{"type":"string"},"type":"array","title":"Account Notes","description":"Account-level callouts (margin, buying power, etc.)."},"follow_up_tasks":{"items":{"type":"string"},"type":"array","title":"Follow Up Tasks","description":"Actionable next steps for the assistant or trader."}},"additionalProperties":false,"type":"object","required":["execution_ready","plan_summary"],"title":"OrderPlanResponse"},"StopLossLeg":{"properties":{"stop_price":{"type":"number","title":"Stop Price","description":"Trigger price for the stop-loss child leg (e.g., 225.0)."},"limit_price":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Limit Price","description":"Optional limit price for a stop-limit child leg. Omit to use a market stop; set slightly below the stop (e.g., 224.0) when a limit is required."}},"additionalProperties":false,"type":"object","required":["stop_price"],"title":"StopLossLeg"},"TakeProfitLeg":{"properties":{"limit_price":{"type":"number","title":"Limit Price","description":"Limit price for the take-profit child leg."}},"additionalProperties":false,"type":"object","required":["limit_price"],"title":"TakeProfitLeg"},"ValidationError":{"properties":{"loc":{"items":{"anyOf":[{"type":"string"},{"type":"integer"}]},"type":"array","title":"Location"},"msg":{"type":"string","title":"Message"},"type":{"type":"string","title":"Error Type"}},"type":"object","required":["loc","msg","type"],"title":"ValidationError"},"WatchlistIn":{"properties":{"name":{"type":"string","title":"Name"},"symbols":{"items":{"type":"string"},"type":"array","title":"Symbols"}},"type":"object","required":["name","symbols"],"title":"WatchlistIn"},"OrderResponse":{"type":"object","additionalProperties":true,"required":["id","symbol","status"],"properties":{"id":{"type":"string","title":"Order ID","description":"Unique Alpaca order identifier."},"client_order_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Client Order ID"},"symbol":{"type":"string","title":"Symbol"},"status":{"type":"string","title":"Status","description":"Current order status reported by Alpaca."},"side":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Side"},"type":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Type"},"order_class":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Order Class"},"time_in_force":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Time In Force"},"qty":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Qty"},"notional":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Notional"},"limit_price":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Limit Price"},"stop_price":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Stop Price"},"filled_qty":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Filled Qty"},"submitted_at":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Submitted At"},"updated_at":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Updated At"},"extended_hours":{"anyOf":[{"type":"boolean"},{"type":"null"}],"title":"Extended Hours"},"legs":{"anyOf":[{"type":"array","items":{"type":"object","additionalProperties":true}},{"type":"null"}],"title":"Legs"}}}},"securitySchemes":{"EdgeApiKey":{"type":"apiKey","in":"header","name":"X-API-Key"}}},"jsonSchemaDialect":"https://json-schema.org/draft/2020-12/schema","security":[{"EdgeApiKey":[]}],"servers":[{"url":"https://alpaca-py-production.up.railway.app"}]}
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Alpaca Wrapper",
+    "version": "1.1.0",
+    "description": "All endpoints require the `X-API-Key` header; the `api_key` query parameter is\nsupported as a compatibility fallback. The service propagates Alpaca's rate\nlimits as HTTP 429 responses and surfaces the upstream `Retry-After` header.\nWhen `extended_hours` is enabled the order payload must remain a DAY limit\norder, include `limit_price`, and omit advanced `order_class` values.",
+    "license": {
+      "name": "Proprietary",
+      "url": "https://alpaca-py-production.up.railway.app/legal"
+    }
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Healthz",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Explanation of the rate limit condition."
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/orders/sync": {
+      "post": {
+        "summary": "Order Create Sync",
+        "description": "Synchronously mirror `/v2/orders` in the current thread.\n\nApplies the limit guard (extended-hours must be DAY limit orders)\nand surfaces upstream HTTP 429 responses with their `Retry-After`.",
+        "operationId": "order_create_sync_v2_orders_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": true
+      }
+    },
+    "/v2/orders": {
+      "get": {
+        "summary": "Orders List",
+        "operationId": "orders_list_v2_orders_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Order Create",
+        "description": "Submit an order via Alpaca's `/v2/orders`.\n\nRequires `X-API-Key`, forwards 429 responses with `Retry-After`, and\napplies the limit guard (extended-hours must be DAY limit orders).",
+        "operationId": "order_create_v2_orders_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": true
+      },
+      "delete": {
+        "summary": "Orders Cancel All",
+        "description": "Cancel all open orders.",
+        "operationId": "orders_cancel_all_v2_orders_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": true
+      }
+    },
+    "/analysis/order-plan": {
+      "post": {
+        "summary": "Review proposed Alpaca orders with GPT-5",
+        "description": "Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
+        "operationId": "analyse_order_plan_analysis_order_plan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/account": {
+      "get": {
+        "summary": "Account Get",
+        "operationId": "account_get_v2_account_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/account/activities": {
+      "get": {
+        "summary": "Account Activities",
+        "operationId": "account_activities_v2_account_activities_get",
+        "parameters": [
+          {
+            "name": "activity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Activity Type"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "page_token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/orders/{order_id}": {
+      "get": {
+        "summary": "Orders Get By Id",
+        "operationId": "orders_get_by_id_v2_orders__order_id__get",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Orders Cancel By Id",
+        "description": "Cancel a specific order by id.",
+        "operationId": "orders_cancel_by_id_v2_orders__order_id__delete",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": true
+      }
+    },
+    "/v2/positions": {
+      "get": {
+        "summary": "Positions List V2",
+        "operationId": "positions_list_v2_v2_positions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Positions Close All",
+        "operationId": "positions_close_all_v2_positions_delete",
+        "parameters": [
+          {
+            "name": "cancel_orders",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cancel Orders"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": true
+      }
+    },
+    "/v2/positions/{symbol}": {
+      "get": {
+        "summary": "Positions Get",
+        "operationId": "positions_get_v2_positions__symbol__get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Positions Close",
+        "operationId": "positions_close_v2_positions__symbol__delete",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "cancel_orders",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cancel Orders"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": true
+      }
+    },
+    "/v2/watchlists": {
+      "get": {
+        "summary": "Watchlists List V2",
+        "operationId": "watchlists_list_v2_v2_watchlists_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "description": "Error message explaining why the request is unauthorized."
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Watchlists Create V2",
+        "operationId": "watchlists_create_v2_v2_watchlists_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": true
+      }
+    },
+    "/v2/watchlists/{watchlist_id}": {
+      "get": {
+        "summary": "Watchlists Get V2",
+        "operationId": "watchlists_get_v2_v2_watchlists__watchlist_id__get",
+        "parameters": [
+          {
+            "name": "watchlist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Watchlist Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Watchlists Update V2",
+        "operationId": "watchlists_update_v2_v2_watchlists__watchlist_id__put",
+        "parameters": [
+          {
+            "name": "watchlist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Watchlist Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": true
+      },
+      "delete": {
+        "summary": "Watchlists Delete V2",
+        "operationId": "watchlists_delete_v2_v2_watchlists__watchlist_id__delete",
+        "parameters": [
+          {
+            "name": "watchlist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Watchlist Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": true
+      }
+    },
+    "/v2/quotes": {
+      "get": {
+        "summary": "Get Quotes V2",
+        "operationId": "get_quotes_v2_v2_quotes_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Quotes V2 V2 Quotes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/trades": {
+      "get": {
+        "summary": "Get Trades V2",
+        "operationId": "get_trades_v2_v2_trades_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Trades V2 V2 Trades Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/bars": {
+      "get": {
+        "summary": "Get Bars V2",
+        "operationId": "get_bars_v2_v2_bars_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "1Day",
+              "title": "Timeframe"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Bars V2 V2 Bars Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateOrder": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "notional": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notional"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "enum": [
+              "market",
+              "limit",
+              "stop",
+              "stop_limit",
+              "trailing_stop"
+            ]
+          },
+          "time_in_force": {
+            "type": "string",
+            "title": "Time In Force",
+            "enum": [
+              "day",
+              "gtc",
+              "opg",
+              "cls",
+              "ioc",
+              "fok"
+            ]
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price"
+          },
+          "order_class": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "simple",
+                  "bracket",
+                  "oco",
+                  "oto"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Class"
+          },
+          "take_profit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TakeProfitLeg"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stop_loss": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopLossLeg"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "extended_hours": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extended Hours"
+          },
+          "trail_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trail Price"
+          },
+          "trail_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trail Percent"
+          },
+          "client_order_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Order Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "symbol",
+          "side",
+          "type",
+          "time_in_force"
+        ],
+        "title": "CreateOrder",
+        "oneOf": [
+          {
+            "required": [
+              "qty"
+            ],
+            "properties": {
+              "qty": {
+                "type": "number"
+              }
+            },
+            "not": {
+              "required": [
+                "notional"
+              ]
+            }
+          },
+          {
+            "required": [
+              "notional"
+            ],
+            "properties": {
+              "notional": {
+                "type": "number"
+              }
+            },
+            "not": {
+              "required": [
+                "qty"
+              ]
+            }
+          }
+        ]
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "OrderIntent": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 12,
+            "minLength": 1,
+            "title": "Symbol",
+            "description": "Ticker symbol to trade."
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "description": "Order side."
+          },
+          "order_type": {
+            "type": "string",
+            "maxLength": 24,
+            "minLength": 2,
+            "title": "Order Type",
+            "description": "Order type, e.g. market or limit."
+          },
+          "time_in_force": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 12
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time In Force",
+            "description": "Time-in-force directive such as day or gtc."
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty",
+            "description": "Quantity of shares to trade."
+          },
+          "notional": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notional",
+            "description": "Target notional in USD when quantity is omitted."
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price",
+            "description": "Limit price for limit or stop-limit orders."
+          },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price",
+            "description": "Top-level stop price for standalone stop or stop-limit orders."
+          },
+          "trail_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trail Price",
+            "description": "Trailing stop price (ignored unless type is trailing_stop)."
+          },
+          "trail_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trail Percent",
+            "description": "Trailing stop percentage (ignored unless type is trailing_stop)."
+          },
+          "take_profit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TakeProfitLeg"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional take-profit child order details."
+          },
+          "stop_loss": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopLossLeg"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional stop-loss child order details."
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 400
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Additional human context about the order intent."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "symbol",
+          "side",
+          "order_type"
+        ],
+        "title": "OrderIntent"
+      },
+      "OrderPlanAdjustment": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field",
+            "description": "Order field to adjust, e.g. limit_price."
+          },
+          "suggested_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Value",
+            "description": "Suggested replacement value, expressed as a string."
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "description": "Reason for adjusting this field."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "rationale"
+        ],
+        "title": "OrderPlanAdjustment"
+      },
+      "OrderPlanItem": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol",
+            "description": "Symbol under review."
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "description": "Side of the proposed trade."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "revise",
+              "reject"
+            ],
+            "title": "Status",
+            "description": "High-level recommendation for the order."
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Short natural-language summary of the guidance."
+          },
+          "reasoning": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoning",
+            "description": "Key reasoning bullet points."
+          },
+          "adjustments": {
+            "items": {
+              "$ref": "#/components/schemas/OrderPlanAdjustment"
+            },
+            "type": "array",
+            "title": "Adjustments",
+            "description": "Structured adjustments before execution."
+          },
+          "risk_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Risk Flags",
+            "description": "Risks or guardrails to call out."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "symbol",
+          "side",
+          "status",
+          "summary"
+        ],
+        "title": "OrderPlanItem"
+      },
+      "OrderPlanRequest": {
+        "properties": {
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/OrderIntent"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Orders",
+            "description": "Orders to evaluate."
+          },
+          "include_account": {
+            "type": "boolean",
+            "title": "Include Account",
+            "description": "Include Alpaca account snapshot in the analysis context.",
+            "default": true
+          },
+          "include_positions": {
+            "type": "boolean",
+            "title": "Include Positions",
+            "description": "Include open positions to highlight sizing overlaps.",
+            "default": true
+          },
+          "include_open_orders": {
+            "type": "boolean",
+            "title": "Include Open Orders",
+            "description": "Include currently open orders to detect duplicates.",
+            "default": false
+          },
+          "risk_notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Notes",
+            "description": "Additional risk or compliance constraints for the model to respect."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "": "#/components/schemas/PromptTemplate"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional reusable prompt template reference for the GPT call."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "orders"
+        ],
+        "title": "OrderPlanRequest"
+      },
+      "OrderPlanResponse": {
+        "properties": {
+          "execution_ready": {
+            "type": "boolean",
+            "title": "Execution Ready",
+            "description": "Whether the orders can be sent as-is."
+          },
+          "plan_summary": {
+            "type": "string",
+            "title": "Plan Summary",
+            "description": "Overall synopsis of the execution plan."
+          },
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/OrderPlanItem"
+            },
+            "type": "array",
+            "title": "Orders",
+            "description": "Per-order recommendations."
+          },
+          "account_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Account Notes",
+            "description": "Account-level callouts (margin, buying power, etc.)."
+          },
+          "follow_up_tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Follow Up Tasks",
+            "description": "Actionable next steps for the assistant or trader."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "execution_ready",
+          "plan_summary"
+        ],
+        "title": "OrderPlanResponse"
+      },
+      "StopLossLeg": {
+        "properties": {
+          "stop_price": {
+            "type": "number",
+            "title": "Stop Price",
+            "description": "Trigger price for the stop-loss child leg (e.g., 225.0)."
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price",
+            "description": "Optional limit price for a stop-limit child leg. Omit to use a market stop; set slightly below the stop (e.g., 224.0) when a limit is required."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "stop_price"
+        ],
+        "title": "StopLossLeg"
+      },
+      "TakeProfitLeg": {
+        "properties": {
+          "limit_price": {
+            "type": "number",
+            "title": "Limit Price",
+            "description": "Limit price for the take-profit child leg."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "limit_price"
+        ],
+        "title": "TakeProfitLeg"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WatchlistIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Symbols"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "symbols"
+        ],
+        "title": "WatchlistIn"
+      },
+      "OrderResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "symbol",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Order ID",
+            "description": "Unique Alpaca order identifier."
+          },
+          "client_order_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Order ID"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Current order status reported by Alpaca."
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "order_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Class"
+          },
+          "time_in_force": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time In Force"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "notional": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notional"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "stop_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Price"
+          },
+          "filled_qty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filled Qty"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "extended_hours": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extended Hours"
+          },
+          "legs": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legs"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "EdgeApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "security": [
+    {
+      "EdgeApiKey": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://alpaca-py-production.up.railway.app"
+    }
+  ]
+}

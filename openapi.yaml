@@ -1085,6 +1085,12 @@ components:
           title: Risk Notes
           description: Additional risk or compliance constraints for the model to
             respect.
+        prompt:
+          anyOf:
+          - $ref: '#/components/schemas/PromptTemplate'
+          - type: 'null'
+          title: Prompt
+          description: Optional reusable prompt template reference for the GPT call.
       additionalProperties: false
       type: object
       required:

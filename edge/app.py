@@ -649,11 +649,10 @@ class OrderPlanRequest(BaseModel):
         description="Additional risk or compliance constraints for the model to respect.",
     )
 
-
-prompt: Optional[PromptTemplate] = Field(
-    None,
-    description="Optional reusable prompt template reference for the GPT call.",
-)
+    prompt: Optional[PromptTemplate] = Field(
+        None,
+        description="Optional reusable prompt template reference for the GPT call.",
+    )
 
 
 class OrderPlanAdjustment(BaseModel):
@@ -2316,6 +2315,5 @@ app.openapi = _custom_openapi  # type: ignore[method-assign]
 
 
 # --- end patch ---
-
 
 

@@ -1,4 +1,4 @@
-"""Examples-only shim exposing edge.app symbols (updated Oct 2025)."""
+"""Examples-only shim exposing edge.app symbols (planner schema sync Nov 2025, redeploy trigger v3)."""
 
 from importlib import import_module
 
