@@ -10,6 +10,78 @@
     }
   },
   "paths": {
+    "/analysis/order-plan": {
+      "post": {
+        "summary": "Review proposed Alpaca orders with GPT-5",
+        "description": "Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
+        "operationId": "analyse_order_plan_analysis_order_plan_post",
+        "parameters": [
+          {
+            "name": "stream",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Stream the GPT analysis via server-sent events when true.",
+              "default": false,
+              "title": "Stream"
+            },
+            "description": "Stream the GPT analysis via server-sent events when true."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderPlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metadata/prompts": {
+      "get": {
+        "summary": "List reusable prompt templates",
+        "description": "Surface the prompt template identifiers and versions used by the edge service.",
+        "operationId": "list_prompt_metadata_metadata_prompts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptMetadataResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "summary": "Healthz",
@@ -1100,45 +1172,6 @@
           }
         }
       }
-    },
-    "/analysis/order-plan": {
-      "post": {
-        "summary": "Review proposed Alpaca orders with GPT-5",
-        "description": "Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
-        "operationId": "analyse_order_plan_analysis_order_plan_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OrderPlanRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderPlanResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -1754,7 +1787,7 @@
           "prompt": {
             "anyOf": [
               {
-                "": "#/components/schemas/PromptTemplate"
+                "$ref": "#/components/schemas/PromptTemplate"
               },
               {
                 "type": "null"
@@ -1828,6 +1861,7 @@
             "default": "Order rejected"
           },
           "status": {
+            "type": "integer",
             "const": 409,
             "title": "Status",
             "default": 409
@@ -1843,6 +1877,7 @@
           "context": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -1858,6 +1893,108 @@
           "reason_code"
         ],
         "title": "OrderRejectResponse"
+      },
+      "PromptMetadata": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "Prompt template identifier."
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Prompt template version."
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables",
+            "description": "Default variables supplied with the prompt template."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "PromptMetadata"
+      },
+      "PromptMetadataResponse": {
+        "properties": {
+          "order_plan": {
+            "$ref": "#/components/schemas/PromptMetadata",
+            "description": "Metadata describing the order-plan prompt template."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "order_plan"
+        ],
+        "title": "PromptMetadataResponse"
+      },
+      "PromptTemplate": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Prompt template identifier registered with OpenAI."
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Prompt template version to request."
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables",
+            "description": "Optional variable substitutions to inject into the prompt template."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PromptTemplate"
       },
       "StopLossLeg": {
         "properties": {
@@ -2189,7 +2326,7 @@
   ],
   "servers": [
     {
-      "url": "alpaca-py-production.up.railway.app"
+      "url": "https://alpaca-py-production.up.railway.app"
     }
   ]
 }

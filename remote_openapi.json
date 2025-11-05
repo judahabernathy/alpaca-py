@@ -10,6 +10,78 @@
     }
   },
   "paths": {
+    "/analysis/order-plan": {
+      "post": {
+        "summary": "Review proposed Alpaca orders with GPT-5",
+        "description": "Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
+        "operationId": "analyse_order_plan_analysis_order_plan_post",
+        "parameters": [
+          {
+            "name": "stream",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Stream the GPT analysis via server-sent events when true.",
+              "default": false,
+              "title": "Stream"
+            },
+            "description": "Stream the GPT analysis via server-sent events when true."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderPlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metadata/prompts": {
+      "get": {
+        "summary": "List reusable prompt templates",
+        "description": "Surface the prompt template identifiers and versions used by the edge service.",
+        "operationId": "list_prompt_metadata_metadata_prompts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptMetadataResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "summary": "Healthz",
@@ -41,46 +113,6 @@
             }
           }
         }
-      }
-    },
-    "/v2/orders/sync": {
-      "post": {
-        "summary": "Order Create Sync",
-        "description": "Synchronously mirror `/v2/orders` in the current thread.\n\nApplies the limit guard (extended-hours must be DAY limit orders)\nand surfaces upstream HTTP 429 responses with their `Retry-After`.",
-        "operationId": "order_create_sync_v2_orders_sync_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateOrder"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-openai-isConsequential": true
       }
     },
     "/v2/orders": {
@@ -140,6 +172,16 @@
               }
             }
           },
+          "409": {
+            "description": "Business rule rejection",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRejectResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -185,45 +227,6 @@
           }
         },
         "x-openai-isConsequential": true
-      }
-    },
-    "/analysis/order-plan": {
-      "post": {
-        "summary": "Review proposed Alpaca orders with GPT-5",
-        "description": "Use GPT-5 Structured Output to review proposed orders and return a JSON execution plan with adjustments and risk notes.",
-        "operationId": "analyse_order_plan_analysis_order_plan_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OrderPlanRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrderPlanResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/v2/account": {
@@ -375,6 +378,196 @@
               ],
               "title": "Page Token"
             }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/account/configurations": {
+      "get": {
+        "summary": "Account Configurations Get",
+        "operationId": "account_configurations_get_v2_account_configurations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Account Configurations Patch",
+        "operationId": "account_configurations_patch_v2_account_configurations_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountConfigurationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/assets": {
+      "get": {
+        "summary": "Assets List",
+        "operationId": "assets_list_v2_assets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/assets/{asset_id_or_symbol}": {
+      "get": {
+        "summary": "Assets Get",
+        "operationId": "assets_get_v2_assets__asset_id_or_symbol__get",
+        "parameters": [
+          {
+            "name": "asset_id_or_symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Asset Id Or Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/calendar": {
+      "get": {
+        "summary": "Trading Calendar",
+        "operationId": "trading_calendar_v2_calendar_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/clock": {
+      "get": {
+        "summary": "Market Clock",
+        "operationId": "market_clock_v2_clock_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/corporate_actions/announcements": {
+      "get": {
+        "summary": "Corporate Actions Announcements",
+        "operationId": "corporate_actions_announcements_v2_corporate_actions_announcements_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/orders:by_client_order_id": {
+      "get": {
+        "summary": "Orders By Client Order Id",
+        "operationId": "orders_by_client_order_id_v2_orders_by_client_order_id_get",
+        "parameters": [
+          {
+            "name": "client_order_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Client order identifier as documented in Alpaca Trading API (Oct 2025).",
+              "title": "Client Order Id"
+            },
+            "description": "Client order identifier as documented in Alpaca Trading API (Oct 2025)."
           }
         ],
         "responses": {
@@ -775,42 +968,6 @@
           }
         },
         "x-openai-isConsequential": true
-      },
-      "delete": {
-        "summary": "Watchlists Delete V2",
-        "operationId": "watchlists_delete_v2_v2_watchlists__watchlist_id__delete",
-        "parameters": [
-          {
-            "name": "watchlist_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Watchlist Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-openai-isConsequential": true
       }
     },
     "/v2/quotes": {
@@ -1019,6 +1176,98 @@
   },
   "components": {
     "schemas": {
+      "AccountConfigurationUpdate": {
+        "properties": {
+          "dtbp_check": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dtbp Check",
+            "description": "Day-trade buying power check enforcement (none, entry, exit, both)."
+          },
+          "no_shorting": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Shorting",
+            "description": "Disable all short sales when true."
+          },
+          "suspend_trade": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suspend Trade",
+            "description": "If true, new orders are blocked at the account level."
+          },
+          "trade_confirm_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Confirm Email",
+            "description": "Email preference for order confirmations (all, none, trade_activity)."
+          },
+          "fractional_trading": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fractional Trading",
+            "description": "Enable fractional share trading."
+          },
+          "max_margin_multiplier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Margin Multiplier",
+            "description": "Maximum intraday margin multiplier (e.g. '2', '4')."
+          },
+          "pdt_check": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdt Check",
+            "description": "Pattern day trading check behaviour (enforced, bypassed, entry_only)."
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "AccountConfigurationUpdate",
+        "description": "Matches Alpaca account configuration fields (Oct 2025)."
+      },
       "CreateOrder": {
         "properties": {
           "symbol": {
@@ -1538,7 +1787,7 @@
           "prompt": {
             "anyOf": [
               {
-                "": "#/components/schemas/PromptTemplate"
+                "$ref": "#/components/schemas/PromptTemplate"
               },
               {
                 "type": "null"
@@ -1598,6 +1847,154 @@
           "plan_summary"
         ],
         "title": "OrderPlanResponse"
+      },
+      "OrderRejectResponse": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "https://errors.alpaca/ORDER_REJECTED"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": "Order rejected"
+          },
+          "status": {
+            "type": "integer",
+            "const": 409,
+            "title": "Status",
+            "default": 409
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "reason_code"
+        ],
+        "title": "OrderRejectResponse"
+      },
+      "PromptMetadata": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "Prompt template identifier."
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Prompt template version."
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables",
+            "description": "Default variables supplied with the prompt template."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "PromptMetadata"
+      },
+      "PromptMetadataResponse": {
+        "properties": {
+          "order_plan": {
+            "$ref": "#/components/schemas/PromptMetadata",
+            "description": "Metadata describing the order-plan prompt template."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "order_plan"
+        ],
+        "title": "PromptMetadataResponse"
+      },
+      "PromptTemplate": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Prompt template identifier registered with OpenAI."
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Prompt template version to request."
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables",
+            "description": "Optional variable substitutions to inject into the prompt template."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PromptTemplate"
       },
       "StopLossLeg": {
         "properties": {
@@ -1673,6 +2070,40 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WatchlistEntryPatch": {
+        "properties": {
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol",
+            "description": "Ticker symbol to add (symbol or asset_id required by Oct 2025 docs)."
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id",
+            "description": "UUID of the asset when symbol lookup is ambiguous."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "WatchlistEntryPatch",
+        "description": "Payload for adding an asset to an existing watchlist."
       },
       "WatchlistIn": {
         "properties": {

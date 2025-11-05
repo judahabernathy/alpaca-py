@@ -16,6 +16,54 @@ info:
     name: Proprietary
     url: https://alpaca-py-production.up.railway.app/legal
 paths:
+  /analysis/order-plan:
+    post:
+      summary: Review proposed Alpaca orders with GPT-5
+      description: Use GPT-5 Structured Output to review proposed orders and return
+        a JSON execution plan with adjustments and risk notes.
+      operationId: analyse_order_plan_analysis_order_plan_post
+      parameters:
+      - name: stream
+        in: query
+        required: false
+        schema:
+          type: boolean
+          description: Stream the GPT analysis via server-sent events when true.
+          default: false
+          title: Stream
+        description: Stream the GPT analysis via server-sent events when true.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderPlanRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPlanResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /metadata/prompts:
+    get:
+      summary: List reusable prompt templates
+      description: Surface the prompt template identifiers and versions used by the
+        edge service.
+      operationId: list_prompt_metadata_metadata_prompts_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptMetadataResponse'
   /healthz:
     get:
       summary: Healthz
@@ -47,7 +95,7 @@ paths:
           content:
             application/json:
               schema: {}
-        '401': &id001
+        '401':
           description: Unauthorized
           content:
             application/json:
@@ -103,33 +151,18 @@ paths:
           content:
             application/json:
               schema: {}
-        '401': *id001
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: Error message explaining why the request is unauthorized.
+                additionalProperties: true
       x-openai-isConsequential: true
-  /analysis/order-plan:
-    post:
-      summary: Review proposed Alpaca orders with GPT-5
-      description: Use GPT-5 Structured Output to review proposed orders and return
-        a JSON execution plan with adjustments and risk notes.
-      operationId: analyse_order_plan_analysis_order_plan_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrderPlanRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderPlanResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /v2/account:
     get:
       summary: Account Get
@@ -140,7 +173,17 @@ paths:
           content:
             application/json:
               schema: {}
-        '401': *id001
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: Error message explaining why the request is unauthorized.
+                additionalProperties: true
   /v2/account/activities:
     get:
       summary: Account Activities
@@ -308,39 +351,6 @@ paths:
           content:
             application/json:
               schema: {}
-  /v2/options/contracts:
-    get:
-      summary: Options Contracts
-      operationId: options_contracts_v2_options_contracts_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-  /v2/options/contracts/{contract_id}:
-    get:
-      summary: Options Contract Get
-      operationId: options_contract_get_v2_options_contracts__contract_id__get
-      parameters:
-      - name: contract_id
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Contract Id
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
   /v2/orders:by_client_order_id:
     get:
       summary: Orders By Client Order Id
@@ -425,7 +435,17 @@ paths:
           content:
             application/json:
               schema: {}
-        '401': *id001
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: Error message explaining why the request is unauthorized.
+                additionalProperties: true
     delete:
       summary: Positions Close All
       operationId: positions_close_all_v2_positions_delete
@@ -513,7 +533,17 @@ paths:
           content:
             application/json:
               schema: {}
-        '401': *id001
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    description: Error message explaining why the request is unauthorized.
+                additionalProperties: true
     post:
       summary: Watchlists Create V2
       operationId: watchlists_create_v2_v2_watchlists_post
@@ -1089,7 +1119,6 @@ components:
           anyOf:
           - $ref: '#/components/schemas/PromptTemplate'
           - type: 'null'
-          title: Prompt
           description: Optional reusable prompt template reference for the GPT call.
       additionalProperties: false
       type: object
@@ -1141,6 +1170,7 @@ components:
           title: Title
           default: Order rejected
         status:
+          type: integer
           const: 409
           title: Status
           default: 409
@@ -1152,7 +1182,8 @@ components:
           title: Reason Code
         context:
           anyOf:
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Context
       type: object
@@ -1160,6 +1191,68 @@ components:
       - detail
       - reason_code
       title: OrderRejectResponse
+    PromptMetadata:
+      properties:
+        id:
+          type: string
+          minLength: 1
+          title: Id
+          description: Prompt template identifier.
+        version:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Version
+          description: Prompt template version.
+        variables:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Variables
+          description: Default variables supplied with the prompt template.
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      title: PromptMetadata
+    PromptMetadataResponse:
+      properties:
+        order_plan:
+          $ref: '#/components/schemas/PromptMetadata'
+          description: Metadata describing the order-plan prompt template.
+      additionalProperties: false
+      type: object
+      required:
+      - order_plan
+      title: PromptMetadataResponse
+    PromptTemplate:
+      properties:
+        id:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Id
+          description: Prompt template identifier registered with OpenAI.
+        version:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Version
+          description: Prompt template version to request.
+        variables:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Variables
+          description: Optional variable substitutions to inject into the prompt template.
+      additionalProperties: false
+      type: object
+      title: PromptTemplate
     StopLossLeg:
       properties:
         stop_price:
@@ -1348,4 +1441,4 @@ jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 security:
 - EdgeApiKey: []
 servers:
-- url: alpaca-py-production.up.railway.app
+- url: https://alpaca-py-production.up.railway.app
