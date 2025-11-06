@@ -255,7 +255,7 @@ def evaluate_limit_guard(symbol: str, limit_price: Any, side: str) -> None:
     except ValueError:
         drift_bps = 100.0
 
-    feed = os.getenv("ALPHA_QUOTE_FEED", "iex")
+    feed = _market_data_feed()
 
     try:
         latest = md_client().get_stock_latest_quote(
@@ -536,6 +536,17 @@ def _decode_json(headers: Dict[str, str], body: str) -> Any:
 
 
 
+
+
+def _market_data_feed() -> str:
+    """Resolves the market-data feed supported by the current subscription."""
+
+    return (
+        os.getenv("ALPHA_MARKET_DATA_FEED")
+        or os.getenv("ALPHA_QUOTE_FEED")
+        or os.getenv("APCA_DATA_FEED")
+        or "iex"
+    )
 
 
 def md_client() -> StockHistoricalDataClient:
@@ -1895,10 +1906,12 @@ def get_quotes_v2(
     end: str,
 ) -> list[dict]:
     _require_gateway_key_from_request(request)
+    feed = _market_data_feed()
     req = StockQuotesRequest(
         symbol_or_symbols=[symbol],
         start=datetime.fromisoformat(start),
         end=datetime.fromisoformat(end),
+        feed=feed,
     )
     quotes = md_client().get_stock_quotes(req)
     quotes_df = getattr(quotes, "df", None)
@@ -1916,10 +1929,12 @@ def get_trades_v2(
     end: str,
 ) -> list[dict]:
     _require_gateway_key_from_request(request)
+    feed = _market_data_feed()
     req = StockTradesRequest(
         symbol_or_symbols=[symbol],
         start=datetime.fromisoformat(start),
         end=datetime.fromisoformat(end),
+        feed=feed,
     )
     trades = md_client().get_stock_trades(req)
     trades_df = getattr(trades, "df", None)
@@ -1939,11 +1954,13 @@ def get_bars_v2(
 ) -> list[dict]:
     _require_gateway_key_from_request(request)
     tf = parse_timeframe(timeframe)
+    feed = _market_data_feed()
     req = StockBarsRequest(
         symbol_or_symbols=[symbol],
         timeframe=tf,
         start=datetime.fromisoformat(start),
         end=datetime.fromisoformat(end) if end else None,
+        feed=feed,
     )
     bars = md_client().get_stock_bars(req)
     bars_df = getattr(bars, "df", None)
