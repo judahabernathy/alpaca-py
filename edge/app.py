@@ -95,7 +95,7 @@ def _read_prompt_variables_env(var_name: str) -> Optional[Dict[str, Any]]:
 
 def _build_default_order_plan_prompt() -> Optional[Dict[str, Any]]:
     prompt_id = (os.getenv("ORDER_PLAN_PROMPT_ID") or "").strip()
-    if not prompt_id:
+    if prompt_id.lower() in {"", "none", "null", "disabled"}:
         _read_prompt_variables_env("ORDER_PLAN_PROMPT_VARIABLES")
         return None
     prompt: Dict[str, Any] = {"id": prompt_id}
