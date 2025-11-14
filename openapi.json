@@ -2186,40 +2186,6 @@
         ],
         "title": "ValidationError"
       },
-      "WatchlistEntryPatch": {
-        "properties": {
-          "symbol": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Symbol",
-            "description": "Ticker symbol to add (symbol or asset_id required by Oct 2025 docs)."
-          },
-          "asset_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Asset Id",
-            "description": "UUID of the asset when symbol lookup is ambiguous."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "WatchlistEntryPatch",
-        "description": "Payload for adding an asset to an existing watchlist."
-      },
       "WatchlistIn": {
         "properties": {
           "name": {
