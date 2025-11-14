@@ -7,6 +7,10 @@
     "license": {
       "name": "Proprietary",
       "url": "https://alpaca-py-production.up.railway.app/legal"
+    },
+    "contact": {
+      "name": "SwingGPT Ops",
+      "email": "ops@swinggpt.local"
     }
   },
   "paths": {
@@ -60,7 +64,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Analysis"
+        ]
       }
     },
     "/metadata/prompts": {
@@ -79,7 +86,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Metadata"
+        ]
       }
     },
     "/healthz": {
@@ -112,7 +122,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /healthz",
+        "tags": [
+          "Healthz"
+        ]
       }
     },
     "/v2/orders": {
@@ -145,7 +159,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/orders",
+        "tags": [
+          "V2"
+        ]
       },
       "post": {
         "summary": "Order Create",
@@ -193,7 +211,10 @@
             }
           }
         },
-        "x-openai-isConsequential": true
+        "x-openai-isConsequential": true,
+        "tags": [
+          "V2"
+        ]
       },
       "delete": {
         "summary": "Orders Cancel All",
@@ -226,7 +247,10 @@
             }
           }
         },
-        "x-openai-isConsequential": true
+        "x-openai-isConsequential": true,
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/account": {
@@ -259,7 +283,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/account",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/account/activities": {
@@ -399,7 +427,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/account/activities",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/account/configurations": {
@@ -415,7 +447,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/account/configurations",
+        "tags": [
+          "V2"
+        ]
       },
       "patch": {
         "summary": "Account Configurations Patch",
@@ -449,7 +485,11 @@
               }
             }
           }
-        }
+        },
+        "description": "PATCH /v2/account/configurations",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/assets": {
@@ -465,7 +505,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/assets",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/assets/{asset_id_or_symbol}": {
@@ -502,7 +546,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/assets/{asset_id_or_symbol}",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/calendar": {
@@ -518,7 +566,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/calendar",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/clock": {
@@ -534,7 +586,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/clock",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/corporate_actions/announcements": {
@@ -550,7 +606,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/corporate_actions/announcements",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/orders:by_client_order_id": {
@@ -589,7 +649,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/orders:by_client_order_id",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/orders/{order_id}": {
@@ -626,7 +690,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/orders/{order_id}",
+        "tags": [
+          "V2"
+        ]
       },
       "delete": {
         "summary": "Orders Cancel By Id",
@@ -663,7 +731,10 @@
             }
           }
         },
-        "x-openai-isConsequential": true
+        "x-openai-isConsequential": true,
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/positions": {
@@ -696,7 +767,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/positions",
+        "tags": [
+          "V2"
+        ]
       },
       "delete": {
         "summary": "Positions Close All",
@@ -733,7 +808,11 @@
             }
           }
         },
-        "x-openai-isConsequential": true
+        "x-openai-isConsequential": true,
+        "description": "DELETE /v2/positions",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/positions/{symbol}": {
@@ -770,7 +849,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/positions/{symbol}",
+        "tags": [
+          "V2"
+        ]
       },
       "delete": {
         "summary": "Positions Close",
@@ -816,7 +899,11 @@
             }
           }
         },
-        "x-openai-isConsequential": true
+        "x-openai-isConsequential": true,
+        "description": "DELETE /v2/positions/{symbol}",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/watchlists": {
@@ -849,7 +936,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/watchlists",
+        "tags": [
+          "V2"
+        ]
       },
       "post": {
         "summary": "Watchlists Create V2",
@@ -884,7 +975,11 @@
             }
           }
         },
-        "x-openai-isConsequential": true
+        "x-openai-isConsequential": true,
+        "description": "POST /v2/watchlists",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/watchlists/{watchlist_id}": {
@@ -921,7 +1016,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/watchlists/{watchlist_id}",
+        "tags": [
+          "V2"
+        ]
       },
       "put": {
         "summary": "Watchlists Update V2",
@@ -967,7 +1066,11 @@
             }
           }
         },
-        "x-openai-isConsequential": true
+        "x-openai-isConsequential": true,
+        "description": "PUT /v2/watchlists/{watchlist_id}",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/quotes": {
@@ -1029,7 +1132,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/quotes",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/trades": {
@@ -1091,7 +1198,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/trades",
+        "tags": [
+          "V2"
+        ]
       }
     },
     "/v2/bars": {
@@ -1170,7 +1281,11 @@
               }
             }
           }
-        }
+        },
+        "description": "GET /v2/bars",
+        "tags": [
+          "V2"
+        ]
       }
     }
   },
@@ -2327,6 +2442,24 @@
   "servers": [
     {
       "url": "https://alpaca-edge-production.up.railway.app"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Analysis",
+      "description": "Operations for Analysis"
+    },
+    {
+      "name": "Metadata",
+      "description": "Operations for Metadata"
+    },
+    {
+      "name": "Healthz",
+      "description": "Operations for Healthz"
+    },
+    {
+      "name": "V2",
+      "description": "Operations for V2"
     }
   ]
 }
