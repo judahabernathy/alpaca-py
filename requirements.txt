@@ -11,4 +11,4 @@ python-dotenv
 pydantic
 requests
 PyYAML
-openai>=2.1.0
+openai==2.8.0

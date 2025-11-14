@@ -107,6 +107,15 @@ def _build_default_order_plan_prompt() -> Optional[Dict[str, Any]]:
         prompt["variables"] = variables
     return prompt
 
+
+def _prompt_is_usable(prompt: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not prompt:
+        return None
+    prompt_id = (prompt.get("id") or "").strip().lower()
+    if prompt_id.startswith("pmpt"):
+        return prompt
+    return None
+
 configure_logging()
 
 _ORDER_PLAN_PROMPT_DEFAULT = _build_default_order_plan_prompt()
@@ -154,7 +163,11 @@ class OrderRejectResponse(BaseModel):
 
 @lru_cache(maxsize=1)
 def _cached_openai_client(api_key: str, base_url: Optional[str], timeout: float) -> AsyncOpenAI:
-    headers = {"User-Agent": "alpaca-py/order-plan/1.0"}
+    headers = {
+        "User-Agent": "alpaca-py/order-plan/1.0",
+        # text_format parsing remains behind the assistants beta header today.
+        "OpenAI-Beta": "assistants=v2",
+    }
     return AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout, default_headers=headers)
 
 
@@ -1113,8 +1126,6 @@ async def _call_order_plan_model(
     payload_text = json.dumps(context, ensure_ascii=False)
     schema_json = json.dumps(OrderPlanResponse.model_json_schema(), ensure_ascii=False)
 
-    last_validation_error: ValidationError | None = None
-    parsed: Any | None = None
     base_user_content = [
         {"type": "input_text", "text": "JSON schema (strict): " + schema_json},
         {
@@ -1124,52 +1135,40 @@ async def _call_order_plan_model(
         {"type": "input_text", "text": payload_text},
     ]
 
-    for attempt in range(2):
-        user_content = list(base_user_content)
-        if attempt:
-            user_content.insert(
-                0,
-                {
-                    "type": "input_text",
-                    "text": "Retry: the last response was invalid JSON. Return only valid JSON that matches the schema.",
-                },
-            )
-        try:
-            kwargs: Dict[str, Any] = {
-                "model": OPENAI_MODEL,
-                "input": [
-                    {"role": "system", "content": [{"type": "input_text", "text": system_prompt}]},
-                    {"role": "user", "content": user_content},
-                ],
-                "max_output_tokens": 1800,
-                "text_format": OrderPlanResponse,
-            }
-            if prompt:
-                kwargs["prompt"] = prompt
-            parsed = await client.responses.parse(**kwargs)
-            break
-        except ValidationError as exc:
-            last_validation_error = exc
-            if attempt == 1:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"OpenAI payload validation failed: {exc}",
-                ) from exc
-            continue
-        except APIConnectionError as exc:
-            raise HTTPException(status_code=502, detail=f"OpenAI connection error: {exc}") from exc
-        except APIStatusError as exc:
-            raise HTTPException(status_code=502, detail=f"OpenAI API error: {exc.status_code}") from exc
-        except OpenAIError as exc:
-            raise HTTPException(status_code=502, detail=f"OpenAI error: {exc}") from exc
+    user_content = list(base_user_content)
+    try:
+        kwargs = {
+            "model": OPENAI_MODEL,
+            "input": [
+                {"role": "system", "content": [{"type": "input_text", "text": system_prompt}]},
+                {"role": "user", "content": user_content},
+            ],
+            "max_output_tokens": 1800,
+        }
+        if prompt:
+            kwargs["prompt"] = prompt
+        response_payload = await client.responses.create(**kwargs)
+        log_event(
+            "openai_response_received",
+            has_output=bool(getattr(response_payload, "output", None)),
+        )
+    except APIConnectionError as exc:
+        raise HTTPException(status_code=502, detail=f"OpenAI connection error: {exc}") from exc
+    except APIStatusError as exc:
+        response_text = getattr(getattr(exc, "response", None), "text", None)
+        detail = f"OpenAI API error: {exc.status_code}"
+        log_error(
+            "openai_status_error",
+            status=exc.status_code,
+            response_text=response_text,
+        )
+        if response_text:
+            detail += f" ({response_text})"
+        raise HTTPException(status_code=502, detail=detail) from exc
+    except OpenAIError as exc:
+        raise HTTPException(status_code=502, detail=f"OpenAI error: {exc}") from exc
 
-    if parsed is None:
-        raise HTTPException(
-            status_code=502,
-            detail=f"OpenAI payload validation failed: {last_validation_error}",
-        ) from last_validation_error
-
-    return _coerce_order_plan_response(parsed)
+    return _coerce_order_plan_response(response_payload)
 
 
 
@@ -1185,10 +1184,49 @@ def _coerce_order_plan_response(parsed: Any) -> OrderPlanResponse:
                 candidate = getattr(content, "parsed", None)
                 if isinstance(candidate, OrderPlanResponse):
                     return candidate
+                text_value = getattr(content, "text", None)
+                if isinstance(text_value, str):
+                    extracted = _extract_response_json(text_value)
+                    if extracted:
+                        try:
+                            return OrderPlanResponse.model_validate(extracted)
+                        except ValidationError:
+                            continue
     try:
         return OrderPlanResponse.model_validate(parsed)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=502, detail=f"OpenAI payload validation failed: {exc}") from exc
+
+
+def _extract_response_json(raw_text: str) -> Optional[Dict[str, Any]]:
+    """Extract the first JSON object from a free-form text block."""
+    if not raw_text:
+        return None
+    text = raw_text.strip()
+    if text.startswith("```"):
+        text = text.strip("`").strip()
+        if text.lower().startswith("json"):
+            text = text[4:].strip()
+    stack = 0
+    start = None
+    for idx, char in enumerate(text):
+        if char == "{":
+            if stack == 0:
+                start = idx
+            stack += 1
+        elif char == "}":
+            if stack:
+                stack -= 1
+                if stack == 0 and start is not None:
+                    snippet = text[start : idx + 1]
+                    try:
+                        return json.loads(snippet)
+                    except json.JSONDecodeError:
+                        continue
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
 
 
 async def _iter_order_plan_text(stream: Any) -> AsyncGenerator[str, None]:
@@ -1232,7 +1270,6 @@ async def _stream_order_plan_model(
             {"role": "user", "content": user_content},
         ],
         "max_output_tokens": 1800,
-        "text_format": OrderPlanResponse,
     }
     if prompt:
         stream_kwargs["prompt"] = prompt
@@ -1258,7 +1295,15 @@ async def _stream_order_plan_model(
             return
         raise HTTPException(status_code=502, detail=detail) from exc
     except APIStatusError as exc:
+        response_text = getattr(getattr(exc, "response", None), "text", None)
         detail = f"OpenAI API error: {exc.status_code}"
+        log_error(
+            "openai_status_error",
+            status=exc.status_code,
+            response_text=response_text,
+        )
+        if response_text:
+            detail += f" ({response_text})"
         if has_yielded:
             yield _sse_event("error", detail)
             return
@@ -1300,7 +1345,13 @@ async def analyse_order_plan(
 ) -> Union[OrderPlanResponse, StreamingResponse]:
     _require_gateway_key_from_request(request)
     context = await _collect_order_plan_context(payload)
-    prompt_payload = _resolve_order_plan_prompt(payload.prompt)
+    prompt_payload = _prompt_is_usable(_resolve_order_plan_prompt(payload.prompt))
+    if prompt_payload:
+        log_event(
+            "order_plan_prompt_in_use",
+            prompt_id=prompt_payload.get("id"),
+            prompt_version=prompt_payload.get("version"),
+        )
     if stream:
         return StreamingResponse(
             _stream_order_plan_model(context, prompt_payload),

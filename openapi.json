@@ -2326,7 +2326,7 @@
   ],
   "servers": [
     {
-      "url": "https://alpaca-py-production.up.railway.app"
+      "url": "https://alpaca-edge-production.up.railway.app"
     }
   ]
 }

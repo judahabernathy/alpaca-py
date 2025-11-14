@@ -1282,7 +1282,7 @@ async def test_collect_order_plan_context_gathers(monkeypatch):
 @pytest.mark.asyncio
 async def test_call_order_plan_model_returns_response(monkeypatch):
     class FakeResponses:
-        async def parse(self, **kwargs):
+        async def create(self, **kwargs):
             return app.OrderPlanResponse(
                 execution_ready=True,
                 plan_summary="Looks good",
@@ -1416,22 +1416,24 @@ def test_evaluate_limit_guard_rejects_excessive_drift(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_call_order_plan_model_handles_validation_retry(monkeypatch):
-    attempts = {"count": 0}
-
+async def test_call_order_plan_model_rejects_invalid_json(monkeypatch):
     class FakeResponses:
-        async def parse(self, **kwargs):
-            attempts["count"] += 1
-            if attempts["count"] == 1:
-                app.OrderPlanResponse.model_validate({})
+        async def create(self, **kwargs):
             class Wrapper:
-                parsed = app.OrderPlanResponse(
-                    execution_ready=False,
-                    plan_summary="retry",
-                    orders=[],
-                    account_notes=[],
-                    follow_up_tasks=[],
-                )
+                output = [
+                    {
+                        "content": [
+                            type(
+                                "Chunk",
+                                (),
+                                {
+                                    "text": "not-json",
+                                    "parsed": None,
+                                },
+                            )
+                        ]
+                    }
+                ]
             return Wrapper()
 
     class FakeClient:
@@ -1440,6 +1442,6 @@ async def test_call_order_plan_model_handles_validation_retry(monkeypatch):
 
     monkeypatch.setattr(app, "_get_openai_client", lambda: FakeClient())
 
-    result = await app._call_order_plan_model({"orders": []})
-    assert result.plan_summary == "retry"
+    with pytest.raises(HTTPException):
+        await app._call_order_plan_model({"orders": []})
 
