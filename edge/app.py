@@ -44,7 +44,7 @@ from .logging import (
 )
 
 DEFAULT_API_BASE_URL = "https://paper-api.alpaca.markets"
-PRODUCTION_SERVER_URL = "https://alpaca-py-production.up.railway.app"
+PRODUCTION_SERVER_URL = "https://alpaca-edge-production.up.railway.app"
 API_BASE_URL = (os.getenv("APCA_API_BASE_URL") or APCA_API_BASE_URL or DEFAULT_API_BASE_URL).strip() or DEFAULT_API_BASE_URL
 API_BASE_URL = API_BASE_URL.rstrip("/")
 DATA_BASE_URL = (os.getenv("APCA_DATA_BASE_URL") or APCA_DATA_BASE_URL or DEFAULT_DATA_BASE_URL).strip() or DEFAULT_DATA_BASE_URL
@@ -2108,7 +2108,7 @@ def _build_openapi_schema(routes) -> Dict[str, Any]:
         order, include `limit_price`, and omit advanced `order_class` values.
     """).strip()
 
-    info.setdefault("license", {"name": "Proprietary", "url": "https://alpaca-py-production.up.railway.app/legal"})
+    info.setdefault("license", {"name": "Proprietary", "url": f"{PRODUCTION_SERVER_URL}/legal"})
 
     paths = schema.setdefault("paths", {})
 

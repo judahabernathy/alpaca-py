@@ -14,7 +14,7 @@ info:
     order, include `limit_price`, and omit advanced `order_class` values.'
   license:
     name: Proprietary
-    url: https://alpaca-py-production.up.railway.app/legal
+    url: https://alpaca-edge-production.up.railway.app/legal
 paths:
   /analysis/order-plan:
     post:

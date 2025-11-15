@@ -6,7 +6,7 @@
     "description": "All endpoints require the `X-API-Key` header; the `api_key` query parameter is\nsupported as a compatibility fallback. The service propagates Alpaca's rate\nlimits as HTTP 429 responses and surfaces the upstream `Retry-After` header.\nWhen `extended_hours` is enabled the order payload must remain a DAY limit\norder, include `limit_price`, and omit advanced `order_class` values.",
     "license": {
       "name": "Proprietary",
-      "url": "https://alpaca-py-production.up.railway.app/legal"
+      "url": "https://alpaca-edge-production.up.railway.app/legal"
     }
   },
   "paths": {
@@ -1937,7 +1937,7 @@
   ],
   "servers": [
     {
-      "url": "https://alpaca-py-production.up.railway.app"
+      "url": "https://alpaca-edge-production.up.railway.app"
     }
   ]
 }

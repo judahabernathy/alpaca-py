@@ -999,10 +999,10 @@ def test_default_server_url_and_normalisation(monkeypatch):
     monkeypatch.setenv("SERVER_URL", "http://example.test/api")
     assert app._default_server_url() == "http://example.test/api"
 
-    monkeypatch.setenv("SERVER_URL", "http://alpaca-py-production.up.railway.app")
+    monkeypatch.setenv("SERVER_URL", "http://alpaca-edge-production.up.railway.app")
     assert app._default_server_url() == app.PRODUCTION_SERVER_URL
 
-    assert app._normalise_server_url("http://alpaca-py-production.up.railway.app") == app.PRODUCTION_SERVER_URL
+    assert app._normalise_server_url("http://alpaca-edge-production.up.railway.app") == app.PRODUCTION_SERVER_URL
 
 
 

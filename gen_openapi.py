@@ -37,7 +37,7 @@ base = (
     os.environ.get("PUBLIC_BASE_URL")
     or os.environ.get("RAILWAY_STATIC_URL")
     or os.environ.get("SERVER_URL")
-    or "https://alpaca-py-production.up.railway.app"
+    or "https://alpaca-edge-production.up.railway.app"
 )
 schema["servers"] = [{"url": base}]
 
